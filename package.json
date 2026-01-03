@@ -1,0 +1,38 @@
+{
+  "name": "pulsewave",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PulseWave - A modern WebRTC conferencing solution built on mediasoup",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "turbo run build --filter=@bytepulse/pulsewave-client && changeset publish",
+    "docs:dev": "cd docs && pnpm start",
+    "docs:build": "cd docs && pnpm run build",
+    "docs:serve": "cd docs && pnpm run serve",
+    "docs:generate-api": "cd docs && pnpm run generate-api"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.27.1",
+    "@types/node": "^20.11.5",
+    "eslint": "^8.56.0",
+    "prettier": "^3.2.4",
+    "turbo": "^1.11.3",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.14.1",
+  "author": {
+    "name": "Kaushal Mehta",
+    "url": "https://github.com/kaushald4"
+  }
+}

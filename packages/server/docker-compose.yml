@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  mediasoup:
+    image: pulsewave-client/server:latest
+    container_name: mediasoup-server
+    ports:
+      - '3000:3000' # HTTP API
+      - '40000-50000:40000-50000/udp' # Media ports (UDP)
+    environment:
+      # Server
+      - PORT=3000
+      - HOST=0.0.0.0
+
+      # Mediasoup
+      - MEDIASOUP_NUM_WORKERS=4
+      - MEDIASOUP_MIN_PORT=40000
+      - MEDIASOUP_MAX_PORT=50000
+      - MEDIASOUP_LOG_LEVEL=error
+
+      # Redis
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_ENABLED=true
+
+      # JWT
+      - API_KEY=${API_KEY:-your-api-key}
+      - API_SECRET=${API_SECRET:-your-api-secret}
+      - JWT_EXPIRES_IN=24h
+
+      # ICE Servers (TURN/STUN)
+      - ICE_SERVERS=${ICE_SERVERS:[]}
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - mediasoup-network
+    healthcheck:
+      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://localhost:3000/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: mediasoup-redis
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    networks:
+      - mediasoup-network
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Optional: Coturn for TURN server (recommended for production)
+  # coturn:
+  #   image: instrumentisto/coturn:latest
+  #   container_name: mediasoup-turn
+  #   ports:
+  #     - "3478:3478/udp"    # STUN/TURN UDP
+  #     - "3478:3478/tcp"    # STUN/TURN TCP
+  #     - "5349:5349/udp"    # TURN over TLS (DTLS)
+  #     - "5349:5349/tcp"    # TURN over TLS (TCP)
+  #   environment:
+  #     - TURN_PORT=3478
+  #     - TURN_TLS_PORT=5349
+  #     - TURN_USERNAME=${TURN_USERNAME:-turnuser}
+  #     - TURN_PASSWORD=${TURN_PASSWORD:-turnpass}
+  #     - TURN_REALM=${TURN_REALM:-mediasoup.local}
+  #     - TURN_SECRET=${TURN_SECRET:-your-secret}
+  #   volumes:
+  #     - ./turnserver.conf:/etc/coturn/turnserver.conf
+  #   restart: unless-stopped
+  #   networks:
+  #     - mediasoup-network
+
+volumes:
+  redis-data:
+    driver: local
+
+networks:
+  mediasoup-network:
+    driver: bridge
