@@ -4,8 +4,16 @@
 
 import { useCallback } from 'react';
 import type { DataPacket } from '@bytepulse/pulsewave-shared';
-import type { RemoteParticipant } from '../types';
+import type { RemoteParticipant, RoomEvents } from '../types';
 import { useRoomContext } from '../context';
+
+/**
+ * Type for data-received event data
+ */
+interface DataReceivedEventData {
+  data: DataPacket;
+  participant: RemoteParticipant;
+}
 
 /**
  * useDataChannel - Hook for data channel functionality
@@ -43,20 +51,26 @@ export function useDataChannelListener(
   // In a real implementation, you would set up event listeners
   // and clean them up on unmount
 
+  const handleDataReceived = useCallback(
+    (eventData: unknown) => {
+      const data = eventData as DataReceivedEventData;
+      callback(data.data, data.participant);
+    },
+    [callback]
+  );
+
   return {
     startListening: () => {
       if (!room) {
         return;
       }
-      room.on('data-received', (data: any) => {
-        callback(data.data, data.participant);
-      });
+      room.on('data-received', handleDataReceived as RoomEvents['data-received']);
     },
     stopListening: () => {
       if (!room) {
         return;
       }
-      room.off('data-received' as any, callback as any);
+      room.off('data-received', handleDataReceived as RoomEvents['data-received']);
     },
   };
 }

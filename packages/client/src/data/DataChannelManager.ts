@@ -6,6 +6,13 @@ import type { DataChannelOptions } from '../types';
 import { DataChannel } from './DataChannel';
 
 /**
+ * WebRTC transport interface for creating data channels
+ */
+interface WebRTCTransport {
+  createDataChannel(label: string, init?: RTCDataChannelInit): RTCDataChannel;
+}
+
+/**
  * DataChannelManager class
  */
 export class DataChannelManager {
@@ -13,12 +20,12 @@ export class DataChannelManager {
   private channels: Map<string, DataChannel> = new Map();
 
   /** Transport for creating data channels */
-  private transport: any;
+  private transport: WebRTCTransport | null;
 
   /** Default data channel options */
   private defaultOptions: Partial<DataChannelOptions>;
 
-  constructor(transport: any, defaultOptions: Partial<DataChannelOptions> = {}) {
+  constructor(transport: WebRTCTransport | null, defaultOptions: Partial<DataChannelOptions> = {}) {
     this.transport = transport;
     this.defaultOptions = defaultOptions;
   }
@@ -30,6 +37,10 @@ export class DataChannelManager {
     const existing = this.channels.get(options.label);
     if (existing) {
       throw new Error(`Data channel with label "${options.label}" already exists`);
+    }
+
+    if (!this.transport) {
+      throw new Error('Transport not available for creating data channels');
     }
 
     const init: RTCDataChannelInit = {

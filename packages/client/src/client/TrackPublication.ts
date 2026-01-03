@@ -56,10 +56,10 @@ export class LocalTrackPublicationImpl
   extends TrackPublicationImpl
   implements LocalTrackPublication
 {
-  public readonly track: LocalTrack;
+  public track: LocalTrack | null;
   private unpublishCallback?: () => Promise<void>;
 
-  constructor(info: TrackInfo, name: string, track: LocalTrack) {
+  constructor(info: TrackInfo, name: string, track: LocalTrack | null) {
     super(info, name);
     this.track = track;
   }

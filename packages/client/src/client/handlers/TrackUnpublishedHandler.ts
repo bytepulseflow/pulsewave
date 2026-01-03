@@ -6,6 +6,9 @@ import { BaseHandler } from './BaseHandler';
 import type { HandlerContext } from './types';
 import type { RoomClient } from '../RoomClient';
 import type { RemoteParticipantImpl } from '../Participant';
+import { createModuleLogger } from '../../utils/logger';
+
+const logger = createModuleLogger('handler:track-unpublished');
 
 export class TrackUnpublishedHandler extends BaseHandler {
   public readonly type = 'track_unpublished';
@@ -29,7 +32,7 @@ export class TrackUnpublishedHandler extends BaseHandler {
         this.emit(context, 'track-unpublished', { publication, participant });
       }
 
-      console.log(`Track unpublished: ${trackSid} from participant ${participant.identity}`);
+      logger.info(`Track unpublished: ${trackSid} from participant ${participant.identity}`);
     }
   }
 }

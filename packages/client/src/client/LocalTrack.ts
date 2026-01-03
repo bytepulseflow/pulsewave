@@ -5,6 +5,9 @@
 import type { TrackInfo } from '@bytepulse/pulsewave-shared';
 import type { LocalTrackEvents } from '../types';
 import { Track } from './Track';
+import { createModuleLogger } from '../utils/logger';
+
+const logger = createModuleLogger('local-track');
 
 /**
  * LocalTrack class representing a local media track
@@ -46,7 +49,10 @@ export class LocalTrack extends Track {
     if (!this.localListeners.has(event)) {
       this.localListeners.set(event, new Set());
     }
-    this.localListeners.get(event)!.add(listener as (data: unknown) => void);
+    const listeners = this.localListeners.get(event);
+    if (listeners) {
+      listeners.add(listener as (data: unknown) => void);
+    }
   }
 
   /**
@@ -69,7 +75,7 @@ export class LocalTrack extends Track {
         try {
           listener(data);
         } catch (error) {
-          console.error(`Error in ${event} listener:`, error);
+          logger.error(`Error in ${event} listener`, { error });
         }
       });
     }

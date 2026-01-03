@@ -6,6 +6,9 @@ import { CLIENT_EVENTS } from '@bytepulse/pulsewave-shared';
 import { BaseHandler } from './BaseHandler';
 import type { HandlerContext } from './types';
 import type { LeaveMessage } from '@bytepulse/pulsewave-shared';
+import { createModuleLogger } from '../../utils/logger';
+
+const logger = createModuleLogger('handler:leave');
 
 export class LeaveHandler extends BaseHandler {
   public readonly type = CLIENT_EVENTS.LEAVE;
@@ -38,7 +41,7 @@ export class LeaveHandler extends BaseHandler {
     // Remove participant
     room.removeParticipant(participant.sid);
 
-    console.log(`Participant ${participant.identity} left room ${room.name}`);
+    logger.info(`Participant ${participant.identity} left room ${room.name}`);
 
     // Clear connection data
     context.ws.participantSid = undefined;

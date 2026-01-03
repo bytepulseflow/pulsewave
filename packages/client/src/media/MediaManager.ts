@@ -6,6 +6,9 @@ import type { MediaTrackOptions } from '../types';
 import { TrackKind, TrackSource } from '@bytepulse/pulsewave-shared';
 import { LocalTrack } from '../client/LocalTrack';
 import type { TrackInfo } from '@bytepulse/pulsewave-shared';
+import { createModuleLogger } from '../utils/logger';
+
+const logger = createModuleLogger('media-manager');
 
 /**
  * MediaManager - Handles device enumeration and media stream acquisition
@@ -36,7 +39,7 @@ export class MediaManager {
       this.videoInputDevices = devices.filter((d) => d.kind === 'videoinput');
       this.audioOutputDevices = devices.filter((d) => d.kind === 'audiooutput');
     } catch (error) {
-      console.error('Failed to enumerate devices:', error);
+      logger.error('Failed to enumerate devices', { error });
       throw error;
     }
   }
@@ -69,7 +72,7 @@ export class MediaManager {
     try {
       return await navigator.mediaDevices.getUserMedia(constraints);
     } catch (error) {
-      console.error('Failed to get user media:', error);
+      logger.error('Failed to get user media', { error });
       throw error;
     }
   }
@@ -79,9 +82,9 @@ export class MediaManager {
    */
   async getDisplayMedia(constraints?: MediaStreamConstraints): Promise<MediaStream> {
     try {
-      return await navigator.mediaDevices.getDisplayMedia(constraints as any);
+      return await navigator.mediaDevices.getDisplayMedia(constraints);
     } catch (error) {
-      console.error('Failed to get display media:', error);
+      logger.error('Failed to get display media', { error });
       throw error;
     }
   }
@@ -144,10 +147,10 @@ export class MediaManager {
    * Create a screen share track
    */
   async createScreenShareTrack(_options?: MediaTrackOptions): Promise<LocalTrack> {
-    const constraints: any = {
+    const constraints: MediaStreamConstraints = {
       video: {
         cursor: 'always',
-      },
+      } as MediaTrackConstraints,
       audio: false,
     };
 
@@ -181,15 +184,15 @@ export class MediaManager {
     video: LocalTrack;
     audio: LocalTrack;
   }> {
-    const constraints: any = {
+    const constraints: MediaStreamConstraints = {
       video: {
         cursor: 'always',
-      },
+      } as MediaTrackConstraints,
       audio: {
         echoCancellation: true,
         noiseSuppression: true,
         autoGainControl: true,
-      },
+      } as MediaTrackConstraints,
     };
 
     const stream = await this.getDisplayMedia(constraints);
@@ -372,7 +375,7 @@ export class MediaManager {
       stream.getTracks().forEach((track) => track.stop());
       return true;
     } catch (error) {
-      console.error('Camera permission denied:', error);
+      logger.error('Camera permission denied', { error });
       return false;
     }
   }
@@ -386,7 +389,7 @@ export class MediaManager {
       stream.getTracks().forEach((track) => track.stop());
       return true;
     } catch (error) {
-      console.error('Microphone permission denied:', error);
+      logger.error('Microphone permission denied', { error });
       return false;
     }
   }

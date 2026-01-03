@@ -5,6 +5,9 @@
 import type { TrackInfo } from '@bytepulse/pulsewave-shared';
 import { TrackKind, TrackSource } from '@bytepulse/pulsewave-shared';
 import { LocalTrack } from '../client/LocalTrack';
+import { createModuleLogger } from '../utils/logger';
+
+const logger = createModuleLogger('audio-track');
 
 /**
  * AudioTrack - Helper class for audio track management
@@ -46,7 +49,7 @@ export class AudioTrack extends LocalTrack {
   setVolume(_volume: number): void {
     // Note: Web Audio API would be needed for actual volume control
     // This is a placeholder
-    console.warn('Volume control requires Web Audio API integration');
+    logger.warn('Volume control requires Web Audio API integration');
   }
 
   /**

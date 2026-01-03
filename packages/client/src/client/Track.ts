@@ -4,6 +4,9 @@
 
 import type { TrackKind, TrackInfo } from '@bytepulse/pulsewave-shared';
 import type { TrackEvents } from '../types';
+import { createModuleLogger } from '../utils/logger';
+
+const logger = createModuleLogger('track');
 
 /**
  * Base Track class representing a media track
@@ -78,7 +81,7 @@ export class Track {
     const stream = new MediaStream([this.mediaTrack]);
     element.srcObject = stream;
     element.play().catch((error) => {
-      console.error('Failed to play media:', error);
+      logger.error('Failed to play media', { error });
     });
   }
 
@@ -125,7 +128,10 @@ export class Track {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());
     }
-    this.listeners.get(event)!.add(listener as (data: unknown) => void);
+    const listeners = this.listeners.get(event);
+    if (listeners) {
+      listeners.add(listener as (data: unknown) => void);
+    }
   }
 
   /**
@@ -148,7 +154,7 @@ export class Track {
         try {
           listener(data);
         } catch (error) {
-          console.error(`Error in ${event} listener:`, error);
+          logger.error(`Error in ${event} listener`, { error });
         }
       });
     }

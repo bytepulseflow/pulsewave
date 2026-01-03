@@ -6,6 +6,9 @@ import { BaseHandler } from './BaseHandler';
 import type { HandlerContext } from './types';
 import type { RoomClient } from '../RoomClient';
 import type { RemoteParticipantImpl } from '../Participant';
+import { createModuleLogger } from '../../utils/logger';
+
+const logger = createModuleLogger('handler:track-published');
 
 export class TrackPublishedHandler extends BaseHandler {
   public readonly type = 'track_published';
@@ -32,8 +35,8 @@ export class TrackPublishedHandler extends BaseHandler {
           // Subscribe to the new track
           client
             .subscribeToTrack(trackSid)
-            .then(() => console.log(`Auto-subscribed to track ${trackSid}`))
-            .catch((error: Error) => console.error('Failed to auto-subscribe to track:', error));
+            .then(() => logger.debug(`Auto-subscribed to track ${trackSid}`))
+            .catch((error: Error) => logger.error('Failed to auto-subscribe to track', { error }));
         });
       }
     }

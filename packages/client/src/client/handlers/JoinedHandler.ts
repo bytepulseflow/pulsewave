@@ -9,6 +9,9 @@ import type { HandlerContext } from './types';
 import { LocalParticipantImpl } from '../LocalParticipant';
 import { RemoteParticipantImpl } from '../Participant';
 import type { RoomClient } from '../RoomClient';
+import { createModuleLogger } from '../../utils/logger';
+
+const logger = createModuleLogger('handler:joined');
 
 export class JoinedHandler extends BaseHandler {
   public readonly type = 'joined';
@@ -64,9 +67,9 @@ export class JoinedHandler extends BaseHandler {
       client
         .ensureWebRTCInitialized()
         .then(() => client.subscribeToAllTracks())
-        .then(() => console.log('Auto-subscribed to all existing tracks'))
+        .then(() => logger.info('Auto-subscribed to all existing tracks'))
         .catch((error: Error) =>
-          console.error('Failed to auto-subscribe to existing tracks:', error)
+          logger.error('Failed to auto-subscribe to existing tracks', { error })
         );
     }
   }

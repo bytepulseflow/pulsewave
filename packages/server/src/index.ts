@@ -10,6 +10,9 @@ import { RoomManager } from './sfu';
 import { WebSocketServer } from './websocket';
 import { RedisManager } from './redis';
 import { routes } from './api';
+import { createModuleLogger } from './utils/logger';
+
+const logger = createModuleLogger('server');
 
 interface ServerInfo {
   name: string;
@@ -83,22 +86,22 @@ class MediasoupServer {
    * Initialize the server
    */
   public async initialize(): Promise<void> {
-    console.log('Initializing Mediasoup Server...');
+    logger.info('Initializing Mediasoup Server...');
 
     // Initialize Redis if enabled
     if (this.config.redis.enabled) {
-      console.log('Connecting to Redis...');
+      logger.info('Connecting to Redis...');
       this.redisManager = new RedisManager(this.config.redis);
       await new Promise((resolve) => setTimeout(resolve, 100)); // Wait for connection
-      console.log('Redis connected');
+      logger.info('Redis connected');
     }
 
     // Create mediasoup workers
-    console.log(`Creating ${this.config.mediasoup.numWorkers} mediasoup workers...`);
+    logger.info(`Creating ${this.config.mediasoup.numWorkers} mediasoup workers...`);
     for (let i = 0; i < this.config.mediasoup.numWorkers; i++) {
       const worker = await createWorker(this.config.mediasoup);
       this.workers.push(worker);
-      console.log(`Worker ${i + 1} created`);
+      logger.info(`Worker ${i + 1} created`);
     }
 
     // Create room manager
@@ -111,7 +114,7 @@ class MediasoupServer {
       this.redisManager,
       this.config.jwt
     );
-    console.log('WebSocket server initialized');
+    logger.info('WebSocket server initialized');
   }
 
   /**
@@ -123,8 +126,8 @@ class MediasoupServer {
     const { port, host } = this.config.server;
 
     this.httpServer.listen(port, host, () => {
-      console.log(`Server listening on http://${host}:${port}`);
-      console.log(`WebSocket endpoint: ws://${host}:${port}`);
+      logger.info(`Server listening on http://${host}:${port}`);
+      logger.info(`WebSocket endpoint: ws://${host}:${port}`);
     });
   }
 
@@ -132,7 +135,7 @@ class MediasoupServer {
    * Stop the server
    */
   public async stop(): Promise<void> {
-    console.log('Shutting down server...');
+    logger.info('Shutting down server...');
 
     // Close WebSocket server
     this.wsServer.close();
@@ -154,7 +157,7 @@ class MediasoupServer {
     // Close HTTP server
     return new Promise((resolve) => {
       this.httpServer.close(() => {
-        console.log('Server stopped');
+        logger.info('Server stopped');
         resolve();
       });
     });
@@ -169,13 +172,13 @@ async function main(): Promise<void> {
 
   // Handle graceful shutdown
   process.on('SIGINT', async () => {
-    console.log('\nReceived SIGINT, shutting down...');
+    logger.info('Received SIGINT, shutting down...');
     await server.stop();
     process.exit(0);
   });
 
   process.on('SIGTERM', async () => {
-    console.log('\nReceived SIGTERM, shutting down...');
+    logger.info('Received SIGTERM, shutting down...');
     await server.stop();
     process.exit(0);
   });
@@ -187,7 +190,7 @@ async function main(): Promise<void> {
 // Start if this file is run directly
 if (require.main === module) {
   main().catch((error) => {
-    console.error('Failed to start server:', error);
+    logger.error({ error }, 'Failed to start server');
     process.exit(1);
   });
 }

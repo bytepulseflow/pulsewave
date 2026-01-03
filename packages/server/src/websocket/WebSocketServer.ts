@@ -14,6 +14,9 @@ import type { ServerMessage, ClientMessage } from '@bytepulse/pulsewave-shared';
 import { ErrorCode } from '@bytepulse/pulsewave-shared';
 import type { Room } from '../sfu/Room';
 import { handlerRegistry, type WebSocketConnection } from './handlers';
+import { createModuleLogger } from '../utils/logger';
+
+const logger = createModuleLogger('websocket');
 
 /**
  * WebSocketServer class
@@ -51,7 +54,7 @@ export class WebSocketServer {
     (ws as WebSocketConnection).socketId = socketId;
     this.connections.set(socketId, ws as WebSocketConnection);
 
-    console.log(`WebSocket connected: ${socketId}`);
+    logger.info(`WebSocket connected: ${socketId}`);
 
     ws.on('message', (data: Buffer) => {
       this.handleMessage(ws as WebSocketConnection, data);
@@ -62,7 +65,7 @@ export class WebSocketServer {
     });
 
     ws.on('error', (error) => {
-      console.error(`WebSocket error: ${socketId}`, error);
+      logger.error({ error, socketId }, 'WebSocket error');
     });
   }
 
@@ -74,7 +77,7 @@ export class WebSocketServer {
   private async handleMessage(ws: WebSocketConnection, data: Buffer): Promise<void> {
     try {
       const message: ClientMessage = JSON.parse(data.toString());
-      console.log(`Received message: ${message.type} from ${ws.socketId}`);
+      logger.debug(`Received message: ${message.type} from ${ws.socketId}`);
 
       // Create handler context
       const context = {
@@ -89,7 +92,7 @@ export class WebSocketServer {
       // Handle message through registry
       await handlerRegistry.handle(context, message);
     } catch (error) {
-      console.error('Error handling message:', error);
+      logger.error({ error }, 'Error handling message');
       this.sendError(ws, ErrorCode.Unknown, 'Failed to process message');
     }
   }
@@ -98,7 +101,7 @@ export class WebSocketServer {
    * Handle WebSocket close
    */
   private async handleClose(ws: WebSocketConnection): Promise<void> {
-    console.log(`WebSocket disconnected: ${ws.socketId}`);
+    logger.info(`WebSocket disconnected: ${ws.socketId}`);
 
     // Handle leave if participant was in a room
     if (ws.roomSid && ws.participantSid) {
@@ -119,7 +122,7 @@ export class WebSocketServer {
           // Remove participant
           room.removeParticipant(participant.sid);
 
-          console.log(`Participant ${participant.identity} left room ${room.name}`);
+          logger.info(`Participant ${participant.identity} left room ${room.name}`);
         }
       }
     }

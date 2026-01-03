@@ -2,10 +2,13 @@
  * MediasoupWorker - Wrapper around mediasoup worker
  */
 
-import type { Worker } from 'mediasoup/types';
+import type { Worker, WorkerLogTag } from 'mediasoup/types';
 import type { RoomOptions } from './Room';
 import { Room } from './Room';
 import type { MediasoupConfig } from '../config';
+import { createModuleLogger } from '../utils/logger';
+
+const logger = createModuleLogger('mediasoup-worker');
 
 /**
  * MediasoupWorker class
@@ -19,7 +22,7 @@ export class MediasoupWorker {
     this.rooms = new Map();
 
     this.worker.on('died', () => {
-      console.error('Mediasoup worker died');
+      logger.error('Mediasoup worker died');
     });
   }
 
@@ -146,8 +149,8 @@ export async function createWorker(config: MediasoupConfig): Promise<MediasoupWo
   const { createWorker: createMediasoupWorker } = await import('mediasoup');
 
   const worker = await createMediasoupWorker({
-    logLevel: config.logLevel as any,
-    logTags: config.logTags as any,
+    logLevel: config.logLevel as 'debug' | 'warn' | 'error' | 'none',
+    logTags: config.logTags as WorkerLogTag[],
     rtcMinPort: config.rtcMinPort,
     rtcMaxPort: config.rtcMaxPort,
   });

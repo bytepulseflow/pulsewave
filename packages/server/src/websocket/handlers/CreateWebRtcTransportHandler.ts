@@ -6,6 +6,9 @@ import { ErrorCode } from '@bytepulse/pulsewave-shared';
 import { BaseHandler } from './BaseHandler';
 import type { HandlerContext } from './types';
 import type { CreateTransportMessage } from '@bytepulse/pulsewave-shared';
+import { createModuleLogger } from '../../utils/logger';
+
+const logger = createModuleLogger('handler:transport');
 
 export class CreateWebRtcTransportHandler extends BaseHandler {
   public readonly type = 'create_transport';
@@ -58,9 +61,9 @@ export class CreateWebRtcTransportHandler extends BaseHandler {
         direction,
       });
 
-      console.log(`WebRTC transport created for participant ${participant.identity}`);
+      logger.info(`WebRTC transport created for participant ${participant.identity}`);
     } catch (error) {
-      console.error('Failed to create WebRTC transport:', error);
+      logger.error({ error }, 'Failed to create WebRTC transport');
       this.sendError(context.ws, ErrorCode.Unknown, 'Failed to create transport');
     }
   }

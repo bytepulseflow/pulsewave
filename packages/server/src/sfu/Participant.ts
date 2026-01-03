@@ -13,6 +13,9 @@ import {
 } from '@bytepulse/pulsewave-shared';
 import type { Producer, Consumer, Transport } from 'mediasoup/types';
 import type { Room } from './Room';
+import { createModuleLogger } from '../utils/logger';
+
+const logger = createModuleLogger('participant');
 
 /**
  * Participant class
@@ -117,7 +120,7 @@ export class Participant {
     const track = new Track(id, kind, source);
     this.tracks.set(id, track);
     this.producers.set(id, producer);
-    console.log(`Participant ${this.identity} added producer ${id}, track SID: ${track.sid}`);
+    logger.debug(`Participant ${this.identity} added producer ${id}, track SID: ${track.sid}`);
     return track;
   }
 

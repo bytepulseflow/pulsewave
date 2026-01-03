@@ -72,7 +72,7 @@ export function LocalParticipantView({
       {mainVideoTrack ? (
         <div className="local-participant-video">
           <VideoTrack
-            track={mainVideoTrack as any}
+            track={mainVideoTrack}
             className={videoClassName}
             objectFit={objectFit}
             muted={true}
@@ -86,7 +86,7 @@ export function LocalParticipantView({
       )}
 
       {/* Audio track (hidden) */}
-      {mainAudioTrack && <AudioTrack track={mainAudioTrack as any} />}
+      {mainAudioTrack && <AudioTrack track={mainAudioTrack} />}
 
       {/* Controls */}
       <div className="local-participant-controls">

@@ -482,9 +482,9 @@ export interface TrackPublication {
  */
 export interface LocalTrackPublication extends TrackPublication {
   /**
-   * The local track
+   * The local track (may be null if not yet initialized)
    */
-  track: LocalTrack;
+  track: LocalTrack | null;
 
   /**
    * Unpublish the track

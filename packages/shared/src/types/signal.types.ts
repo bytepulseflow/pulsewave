@@ -307,6 +307,16 @@ export interface TrackMutedMessage {
 }
 
 /**
+ * Track unmuted message
+ */
+export interface TrackUnmutedMessage {
+  type: 'track_unmuted';
+  participantSid: string;
+  trackSid: string;
+  muted: boolean;
+}
+
+/**
  * Data received message
  */
 export interface DataReceivedMessage {
@@ -338,6 +348,7 @@ export type ServerMessage =
   | TrackSubscribedMessage
   | TrackUnsubscribedMessage
   | TrackMutedMessage
+  | TrackUnmutedMessage
   | DataReceivedMessage
   | ErrorMessage;
 

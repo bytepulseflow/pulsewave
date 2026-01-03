@@ -4,19 +4,21 @@
 
 import { BaseHandler } from './BaseHandler';
 import type { HandlerContext } from './types';
+import type { TrackUnmutedMessage } from '@bytepulse/pulsewave-shared';
 
 export class TrackUnmutedHandler extends BaseHandler {
   public readonly type = 'track_unmuted';
 
-  public handle(context: HandlerContext, message: any): void {
-    const client = context.client as any;
+  public handle(context: HandlerContext, message: TrackUnmutedMessage): void {
+    const client = context.client as { getParticipant: (sid: string) => unknown };
 
-    const participant = client.participants.get(message.participantSid);
+    const participant = client.getParticipant(message.participantSid);
     if (participant) {
-      participant.updateInfo(message.participant);
-      const publication = participant.getTrack(message.trackSid);
-      if (publication && publication.track) {
-        this.emit(context, 'track-unmuted', { track: publication.track, participant });
+      const participantObj = participant as { getTrack: (sid: string) => unknown };
+      const publication = participantObj.getTrack(message.trackSid);
+      const publicationObj = publication as { track?: unknown };
+      if (publicationObj && publicationObj.track) {
+        this.emit(context, 'track-unmuted', { track: publicationObj.track, participant });
       }
     }
   }

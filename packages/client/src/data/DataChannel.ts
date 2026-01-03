@@ -3,6 +3,9 @@
  */
 
 import type { DataChannelEvents } from '../types';
+import { createModuleLogger } from '../utils/logger';
+
+const logger = createModuleLogger('data-channel');
 
 /**
  * DataChannel wrapper class
@@ -60,7 +63,10 @@ export class DataChannel {
    * Send data through the channel
    */
   send(data: string | ArrayBuffer | ArrayBufferView): void {
-    this.channel.send(data as any);
+    // RTCDataChannel.send() accepts string, ArrayBuffer, or ArrayBufferView
+    // TypeScript types for WebRTC have limitations with the send method
+    // @ts-expect-error - RTCDataChannel.send() accepts these types but TypeScript types are incomplete
+    this.channel.send(data);
   }
 
   /**
@@ -81,7 +87,10 @@ export class DataChannel {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());
     }
-    this.listeners.get(event)!.add(listener as (data: unknown) => void);
+    const listeners = this.listeners.get(event);
+    if (listeners) {
+      listeners.add(listener as (data: unknown) => void);
+    }
   }
 
   /**
@@ -104,7 +113,7 @@ export class DataChannel {
         try {
           listener(data);
         } catch (error) {
-          console.error(`Error in ${event} listener:`, error);
+          logger.error(`Error in ${event} listener`, { error });
         }
       });
     }

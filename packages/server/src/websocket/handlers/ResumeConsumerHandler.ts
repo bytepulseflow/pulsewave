@@ -5,6 +5,9 @@
 import { BaseHandler } from './BaseHandler';
 import type { HandlerContext } from './types';
 import type { ResumeConsumerMessage } from '@bytepulse/pulsewave-shared';
+import { createModuleLogger } from '../../utils/logger';
+
+const logger = createModuleLogger('handler:resume');
 
 export class ResumeConsumerHandler extends BaseHandler {
   public readonly type = 'resume_consumer';
@@ -30,10 +33,10 @@ export class ResumeConsumerHandler extends BaseHandler {
 
       if (consumer) {
         await consumer.resume();
-        console.log(`Consumer resumed: ${consumerId}`);
+        logger.info(`Consumer resumed: ${consumerId}`);
       }
     } catch (error) {
-      console.error('Failed to resume consumer:', error);
+      logger.error({ error }, 'Failed to resume consumer');
     }
   }
 }

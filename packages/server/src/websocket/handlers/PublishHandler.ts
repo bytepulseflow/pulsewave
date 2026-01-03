@@ -2,10 +2,14 @@
  * Publish track handler
  */
 
-import { CLIENT_EVENTS, ErrorCode } from '@bytepulse/pulsewave-shared';
+import { CLIENT_EVENTS, ErrorCode, TrackSource } from '@bytepulse/pulsewave-shared';
 import { BaseHandler } from './BaseHandler';
 import type { HandlerContext } from './types';
-import type { PublishMessage } from '@bytepulse/pulsewave-shared';
+import type { PublishMessage, TrackPublishResponse } from '@bytepulse/pulsewave-shared';
+import type { RtpParameters } from 'mediasoup/types';
+import { createModuleLogger } from '../../utils/logger';
+
+const logger = createModuleLogger('handler:publish');
 
 export class PublishHandler extends BaseHandler {
   public readonly type = CLIENT_EVENTS.PUBLISH;
@@ -40,13 +44,13 @@ export class PublishHandler extends BaseHandler {
       // Create producer - cast rtpParameters to mediasoup type
       const producer = await transport.produce({
         kind,
-        rtpParameters: rtpParameters as any,
+        rtpParameters: rtpParameters as RtpParameters,
         appData,
       });
 
       // Add producer to participant
       const source = (appData?.source as string) || (kind === 'audio' ? 'microphone' : 'camera');
-      const track = participant.addProducer(producer.id, producer, kind, source as any);
+      const track = participant.addProducer(producer.id, producer, kind, source as TrackSource);
 
       // Notify other participants
       context.broadcast(
@@ -60,15 +64,16 @@ export class PublishHandler extends BaseHandler {
       );
 
       // Send producer ID to client
-      this.send(context.ws, {
+      const response: TrackPublishResponse = {
         type: 'track_published',
         id: producer.id,
         trackSid: track.sid,
-      });
+      };
+      this.send(context.ws, response);
 
-      console.log(`Track published: ${track.sid} by ${participant.identity}`);
+      logger.info(`Track published: ${track.sid} by ${participant.identity}`);
     } catch (error) {
-      console.error('Failed to publish track:', error);
+      logger.error({ error }, 'Failed to publish track');
       this.sendError(context.ws, ErrorCode.Unknown, 'Failed to publish track');
     }
   }
