@@ -1,6 +1,13 @@
 # PulseWave
 
-A modern WebRTC conferencing solution built on top of mediasoup, providing a complete video/audio communication platform with simple React hooks and a self-hosted server.
+![Under Active Testing](https://img.shields.io/badge/status-under%20active%20testing-orange?style=for-the-badge)
+![Powered by mediasoup](https://img.shields.io/badge/powered%20by-mediasoup-blue?style=for-the-badge)
+![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=for-the-badge)
+
+A modern WebRTC conferencing solution built on top of [mediasoup](https://mediasoup.org/), providing a complete video/audio communication platform with simple React hooks and a self-hosted server.
+
+> **⚠️ Status**: This project is currently under active testing and development. APIs and features may change as we stabilize the platform.
 
 ## Overview
 
