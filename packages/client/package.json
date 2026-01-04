@@ -1,6 +1,6 @@
 {
   "name": "@bytepulse/pulsewave-client",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "PulseWave Client SDK - React hooks and components for WebRTC video/audio",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
