@@ -1,6 +1,6 @@
 {
   "name": "@bytepulse/pulsewave-client",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "PulseWave Client SDK - React hooks and components for WebRTC video/audio",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -19,6 +19,19 @@
     "dist",
     "README.md"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bytepulseflow/pulsewave.git",
+    "directory": "packages/client"
+  },
+  "homepage": "https://github.com/bytepulseflow/pulsewave#readme",
+  "bugs": {
+    "url": "https://github.com/bytepulseflow/pulsewave/issues"
+  },
+  "license": "MIT",
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
@@ -28,8 +41,8 @@
     "test": "vitest"
   },
   "peerDependencies": {
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0"
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
   },
   "dependencies": {
     "@bytepulse/pulsewave-shared": "workspace:*",

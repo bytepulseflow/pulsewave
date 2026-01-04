@@ -1,6 +1,6 @@
 {
   "name": "@bytepulse/pulsewave-server",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "PulseWave Server SDK - Mediasoup SFU server deployable via Docker or self-hosted",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -18,6 +18,25 @@
       "import": "./dist/config/index.js"
     }
   },
+  "files": [
+    "dist",
+    "README.md",
+    "Dockerfile",
+    "docker-compose.yml"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bytepulseflow/pulsewave.git",
+    "directory": "packages/server"
+  },
+  "homepage": "https://github.com/bytepulseflow/pulsewave#readme",
+  "bugs": {
+    "url": "https://github.com/bytepulseflow/pulsewave/issues"
+  },
+  "license": "MIT",
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",

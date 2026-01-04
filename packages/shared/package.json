@@ -1,7 +1,6 @@
 {
   "name": "@bytepulse/pulsewave-shared",
-  "version": "0.1.0",
-  "private": true,
+  "version": "0.2.0",
   "description": "PulseWave Shared - Types and constants shared between client and server",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -13,6 +12,23 @@
       "default": "./dist/index.js"
     }
   },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bytepulseflow/pulsewave.git",
+    "directory": "packages/shared"
+  },
+  "homepage": "https://github.com/bytepulseflow/pulsewave#readme",
+  "bugs": {
+    "url": "https://github.com/bytepulseflow/pulsewave/issues"
+  },
+  "license": "MIT",
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
