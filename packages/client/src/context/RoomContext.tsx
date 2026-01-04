@@ -8,10 +8,17 @@ import React, {
   useCallback,
   useEffect,
   useState,
+  useRef,
   ReactNode,
 } from 'react';
 import { ConnectionState } from '@bytepulse/pulsewave-shared';
-import type { RoomClientOptions, LocalParticipant, RemoteParticipant, Participant } from '../types';
+import type {
+  RoomClientOptions,
+  LocalParticipant,
+  RemoteParticipant,
+  Participant,
+  LocalTrackPublication,
+} from '../types';
 import { RoomClient } from '../client/RoomClient';
 import { createModuleLogger } from '../utils/logger';
 
@@ -35,6 +42,11 @@ export interface RoomContextValue {
    * Local participant
    */
   localParticipant: LocalParticipant | null;
+
+  /**
+   * Local participant's tracks (immutable snapshot)
+   */
+  localTracks: LocalTrackPublication[];
 
   /**
    * Remote participants
@@ -113,16 +125,24 @@ export function RoomProvider({
     'disconnected' as ConnectionState
   );
   const [localParticipant, setLocalParticipant] = useState<LocalParticipant | null>(null);
+  const [localTracks, setLocalTracks] = useState<LocalTrackPublication[]>([]);
   const [participants, setParticipants] = useState<RemoteParticipant[]>([]);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
+  // Use refs to track connection state for Strict Mode compatibility
+  const isConnectingRef = useRef(false);
+  const isConnectedRef = useRef(false);
+
   // Connect to the room
   const connect = useCallback(async () => {
-    if (isConnecting || (room && connectionState === 'connected')) {
+    // Prevent duplicate connections (important for React Strict Mode)
+    if (isConnectingRef.current || isConnectedRef.current) {
+      logger.debug('Connection already in progress or established, skipping');
       return;
     }
 
+    isConnectingRef.current = true;
     setIsConnecting(true);
     setError(null);
 
@@ -138,10 +158,24 @@ export function RoomProvider({
 
       roomClient.on('local-participant-joined', (participant: LocalParticipant) => {
         setLocalParticipant(participant);
+
+        // Initialize local tracks from participant
+        setLocalTracks([...participant.getTracks()]);
+
+        // Set up track event listeners to sync React state
+        const syncTracks = () => {
+          setLocalTracks([...participant.getTracks()]);
+        };
+
+        participant.on('track-published', syncTracks as (pub: unknown) => void);
+        participant.on('track-unpublished', syncTracks as (pub: unknown) => void);
+        participant.on('track-muted', syncTracks as (track: unknown) => void);
+        participant.on('track-unmuted', syncTracks as (track: unknown) => void);
       });
 
       roomClient.on('local-participant-left', () => {
         setLocalParticipant(null);
+        setLocalTracks([]);
       });
 
       roomClient.on('participant-joined', (participant: Participant) => {
@@ -158,26 +192,42 @@ export function RoomProvider({
         setParticipants((prev) => prev.filter((p) => p.sid !== participant.sid));
       });
 
+      // Listen for track subscription events to update participants state
+      roomClient.on('track-subscribed', () => {
+        // Force re-render by updating participants with a new array reference
+        setParticipants((prev) => [...prev]);
+      });
+
+      roomClient.on('track-unsubscribed', () => {
+        // Force re-render by updating participants with a new array reference
+        setParticipants((prev) => [...prev]);
+      });
+
       roomClient.on('error', (err: Error) => {
         setError(err);
         onError?.(err);
       });
 
       await roomClient.connect();
+      isConnectedRef.current = true;
     } catch (err) {
       const error = err as Error;
       setError(error);
       onError?.(error);
+      isConnectedRef.current = false;
     } finally {
+      isConnectingRef.current = false;
       setIsConnecting(false);
     }
-  }, [options, isConnecting, room, connectionState, onConnectionStateChanged, onError]);
+  }, [options, onConnectionStateChanged, onError]);
 
   // Disconnect from the room
   const disconnect = useCallback(async () => {
-    if (!room) {
+    if (!room || !isConnectedRef.current) {
       return;
     }
+
+    isConnectedRef.current = false;
 
     try {
       await room.disconnect();
@@ -188,6 +238,7 @@ export function RoomProvider({
       setRoom(null);
       setConnectionState('disconnected' as ConnectionState);
       setLocalParticipant(null);
+      setLocalTracks([]);
       setParticipants([]);
       setError(null);
     }
@@ -222,6 +273,7 @@ export function RoomProvider({
     room,
     connectionState,
     localParticipant,
+    localTracks,
     participants,
     isConnecting,
     connect,

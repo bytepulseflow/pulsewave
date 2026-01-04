@@ -75,19 +75,17 @@ export function useTrackPublicationsByKind(kind: TrackKind): RemoteTrackPublicat
 
 /**
  * useLocalTracks - Hook to access local participant's tracks
+ *
+ * Returns an immutable snapshot of local tracks from React state.
+ * Automatically updates when tracks are published, unpublished, muted, or unmuted.
  */
 export function useLocalTracks() {
-  const { localParticipant } = useRoomContext();
+  const { localTracks } = useRoomContext();
 
   return useMemo(() => {
-    if (!localParticipant) {
-      return { audioTracks: [], videoTracks: [], allTracks: [] };
-    }
+    const audioTracks = localTracks.filter((t) => t.kind === 'audio');
+    const videoTracks = localTracks.filter((t) => t.kind === 'video');
 
-    const allTracks = localParticipant.getTracks();
-    const audioTracks = allTracks.filter((t) => t.kind === 'audio');
-    const videoTracks = allTracks.filter((t) => t.kind === 'video');
-
-    return { audioTracks, videoTracks, allTracks };
-  }, [localParticipant]);
+    return { audioTracks, videoTracks, allTracks: localTracks };
+  }, [localTracks]);
 }

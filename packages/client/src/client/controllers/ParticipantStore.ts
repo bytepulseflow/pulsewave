@@ -43,6 +43,12 @@ export class ParticipantStore {
       publication.sid,
       publication
     );
+
+    // Emit track-published event to trigger React re-renders
+    (this.localParticipant as unknown as { emit: (event: string, data: unknown) => void }).emit(
+      'track-published',
+      publication
+    );
   }
 
   /**
@@ -58,6 +64,13 @@ export class ParticipantStore {
     for (const [sid, publication] of tracks.entries()) {
       if (sid === producerId) {
         tracks.delete(sid);
+
+        // Emit track-unpublished event to trigger React re-renders
+        (this.localParticipant as unknown as { emit: (event: string, data: unknown) => void }).emit(
+          'track-unpublished',
+          publication
+        );
+
         return publication;
       }
     }

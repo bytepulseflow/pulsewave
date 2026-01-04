@@ -20,6 +20,8 @@ export { TrackSubscribedHandler } from './TrackSubscribedHandler';
 export { TrackUnsubscribedHandler } from './TrackUnsubscribedHandler';
 export { TrackMutedHandler } from './TrackMutedHandler';
 export { TrackUnmutedHandler } from './TrackUnmutedHandler';
+export { TransportCreatedHandler } from './TransportCreatedHandler';
+export { TransportConnectedHandler } from './TransportConnectedHandler';
 export { DataHandler } from './DataHandler';
 export { ErrorHandler } from './ErrorHandler';
 
