@@ -6,6 +6,9 @@ import { CLIENT_EVENTS } from '@bytepulse/pulsewave-shared';
 import { BaseHandler } from './BaseHandler';
 import type { HandlerContext } from './types';
 import type { MuteMessage } from '@bytepulse/pulsewave-shared';
+import { createModuleLogger } from '../../utils/logger';
+
+const logger = createModuleLogger('handler:mute');
 
 export class MuteHandler extends BaseHandler {
   public readonly type = CLIENT_EVENTS.MUTE;
@@ -46,9 +49,9 @@ export class MuteHandler extends BaseHandler {
         context.ws.socketId
       );
 
-      console.log(`Track ${trackSid} ${muted ? 'muted' : 'unmuted'}`);
+      logger.info(`Track ${trackSid} ${muted ? 'muted' : 'unmuted'}`);
     } catch (error) {
-      console.error('Failed to mute track:', error);
+      logger.error({ error }, 'Failed to mute track');
     }
   }
 }

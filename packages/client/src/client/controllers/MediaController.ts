@@ -37,7 +37,11 @@ export class MediaController {
       await this.initialize();
     }
 
-    const track = await this.mediaManager!.createVideoTrack();
+    if (!this.mediaManager) {
+      throw new Error('MediaManager not initialized');
+    }
+
+    const track = await this.mediaManager.createVideoTrack();
     return new LocalTrackImpl(
       {
         sid: '',
@@ -57,7 +61,11 @@ export class MediaController {
       await this.initialize();
     }
 
-    const track = await this.mediaManager!.createAudioTrack();
+    if (!this.mediaManager) {
+      throw new Error('MediaManager not initialized');
+    }
+
+    const track = await this.mediaManager.createAudioTrack();
     return new LocalTrackImpl(
       {
         sid: '',
@@ -77,7 +85,11 @@ export class MediaController {
       await this.initialize();
     }
 
-    const track = await this.mediaManager!.switchVideoDevice(deviceId);
+    if (!this.mediaManager) {
+      throw new Error('MediaManager not initialized');
+    }
+
+    const track = await this.mediaManager.switchVideoDevice(deviceId);
     return new LocalTrackImpl(
       {
         sid: '',
@@ -97,7 +109,11 @@ export class MediaController {
       await this.initialize();
     }
 
-    const track = await this.mediaManager!.switchAudioDevice(deviceId);
+    if (!this.mediaManager) {
+      throw new Error('MediaManager not initialized');
+    }
+
+    const track = await this.mediaManager.switchAudioDevice(deviceId);
     return new LocalTrackImpl(
       {
         sid: '',
@@ -116,7 +132,10 @@ export class MediaController {
     if (!this.mediaManager) {
       await this.initialize();
     }
-    return this.mediaManager!.getAudioInputDevices();
+    if (!this.mediaManager) {
+      throw new Error('MediaManager not initialized');
+    }
+    return this.mediaManager.getAudioInputDevices();
   }
 
   /**
@@ -126,7 +145,10 @@ export class MediaController {
     if (!this.mediaManager) {
       await this.initialize();
     }
-    return this.mediaManager!.getVideoInputDevices();
+    if (!this.mediaManager) {
+      throw new Error('MediaManager not initialized');
+    }
+    return this.mediaManager.getVideoInputDevices();
   }
 
   /**

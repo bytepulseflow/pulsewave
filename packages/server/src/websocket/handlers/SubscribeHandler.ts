@@ -5,7 +5,11 @@
 import { CLIENT_EVENTS, ErrorCode } from '@bytepulse/pulsewave-shared';
 import { BaseHandler } from './BaseHandler';
 import type { HandlerContext } from './types';
-import type { SubscribeMessage } from '@bytepulse/pulsewave-shared';
+import type { SubscribeMessage, TrackSubscribedMessage } from '@bytepulse/pulsewave-shared';
+import type { RtpCapabilities, RtpParameters } from 'mediasoup/types';
+import { createModuleLogger } from '../../utils/logger';
+
+const logger = createModuleLogger('handler:subscribe');
 
 export class SubscribeHandler extends BaseHandler {
   public readonly type = CLIENT_EVENTS.SUBSCRIBE;
@@ -40,7 +44,7 @@ export class SubscribeHandler extends BaseHandler {
       // Create consumer - cast rtpCapabilities to mediasoup type
       const consumer = await transport.consume({
         producerId,
-        rtpCapabilities: rtpCapabilities as any,
+        rtpCapabilities: rtpCapabilities as RtpCapabilities,
         paused: true,
       });
 
@@ -48,18 +52,19 @@ export class SubscribeHandler extends BaseHandler {
       participant.addConsumer(consumer.id, consumer);
 
       // Send consumer info to client
-      this.send(context.ws, {
+      const response: TrackSubscribedMessage = {
         type: 'track_subscribed',
         id: consumer.id,
         producerId,
         kind: consumer.kind,
-        rtpParameters: consumer.rtpParameters as any,
+        rtpParameters: consumer.rtpParameters as RtpParameters,
         trackSid: producerId,
-      });
+      };
+      this.send(context.ws, response);
 
-      console.log(`Track subscribed: ${producerId} by ${participant.identity}`);
+      logger.info(`Track subscribed: ${producerId} by ${participant.identity}`);
     } catch (error) {
-      console.error('Failed to subscribe to track:', error);
+      logger.error({ error }, 'Failed to subscribe to track');
       this.sendError(context.ws, ErrorCode.Unknown, 'Failed to subscribe to track');
     }
   }

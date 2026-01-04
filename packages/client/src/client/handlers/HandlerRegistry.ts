@@ -6,6 +6,7 @@
  */
 
 import type { MessageHandler, HandlerContext } from './types';
+import type { ServerMessage } from '@bytepulse/pulsewave-shared';
 import { JoinedHandler } from './JoinedHandler';
 import { ParticipantJoinedHandler } from './ParticipantJoinedHandler';
 import { ParticipantLeftHandler } from './ParticipantLeftHandler';
@@ -17,6 +18,9 @@ import { TrackMutedHandler } from './TrackMutedHandler';
 import { TrackUnmutedHandler } from './TrackUnmutedHandler';
 import { DataHandler } from './DataHandler';
 import { ErrorHandler } from './ErrorHandler';
+import { createModuleLogger } from '../../utils/logger';
+
+const logger = createModuleLogger('handler-registry');
 
 export class HandlerRegistry {
   private handlers: Map<string, MessageHandler> = new Map();
@@ -80,18 +84,28 @@ export class HandlerRegistry {
   /**
    * Handle a message using the appropriate handler
    */
-  public handle(context: HandlerContext, message: any): void {
-    const handler = this.get(message.type);
+  public handle(context: HandlerContext, message: ServerMessage | Record<string, unknown>): void {
+    const messageType =
+      typeof message === 'object' && message !== null && 'type' in message
+        ? (message.type as string)
+        : undefined;
+
+    if (!messageType) {
+      logger.warn('Invalid message: missing type');
+      return;
+    }
+
+    const handler = this.get(messageType);
 
     if (!handler) {
-      console.warn(`No handler registered for message type: ${message.type}`);
+      logger.warn(`No handler registered for message type: ${messageType}`);
       return;
     }
 
     try {
       handler.handle(context, message);
     } catch (error) {
-      console.error(`Error handling message type ${message.type}:`, error);
+      logger.error(`Error handling message type ${messageType}`, { error });
     }
   }
 

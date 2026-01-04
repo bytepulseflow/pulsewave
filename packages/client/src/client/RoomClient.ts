@@ -28,6 +28,9 @@ import {
   WebRTCController,
   TrackController,
 } from './controllers';
+import { createModuleLogger } from '../utils/logger';
+
+const logger = createModuleLogger('room-client');
 
 export class RoomClient {
   public readonly options: RoomClientOptions;
@@ -158,7 +161,7 @@ export class RoomClient {
     // Delegate to TrackController - handles all domain construction logic
     await this.trackController.enableCamera(mediaTrack);
 
-    console.log('Camera enabled', deviceId ? `device: ${deviceId}` : '');
+    logger.info('Camera enabled', deviceId ? `device: ${deviceId}` : '');
   }
 
   /**
@@ -194,7 +197,7 @@ export class RoomClient {
     // Delegate to TrackController - handles all domain construction logic
     await this.trackController.enableMicrophone(mediaTrack);
 
-    console.log('Microphone enabled', deviceId ? `device: ${deviceId}` : '');
+    logger.info('Microphone enabled', deviceId ? `device: ${deviceId}` : '');
   }
 
   /**
@@ -237,7 +240,7 @@ export class RoomClient {
     // Initialize WebRTC controller
     await this.webRTCController.initialize(this.rtpCapabilities);
 
-    console.log('WebRTC initialized');
+    logger.info('WebRTC initialized');
   }
 
   /**
@@ -282,7 +285,7 @@ export class RoomClient {
     sid: string,
     options?: TrackSubscribeOptions
   ): Promise<RemoteTrack | null> {
-    console.log('subscribeToTrack called with sid:', sid);
+    logger.debug('subscribeToTrack called with sid:', sid);
     return this.trackController.subscribeToTrack(sid, options);
   }
 

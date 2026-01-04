@@ -3,8 +3,11 @@
  */
 
 import type { TrackInfo } from '@bytepulse/pulsewave-shared';
-import type { RemoteTrackEvents } from '../types';
+import type { RemoteTrackEvents, TrackEvents } from '../types';
 import { Track } from './Track';
+import { createModuleLogger } from '../utils/logger';
+
+const logger = createModuleLogger('remote-track');
 
 /**
  * RemoteTrack class representing a remote media track
@@ -26,7 +29,10 @@ export class RemoteTrack extends Track {
     if (!this.remoteListeners.has(event)) {
       this.remoteListeners.set(event, new Set());
     }
-    this.remoteListeners.get(event)!.add(listener as (data: unknown) => void);
+    const listeners = this.remoteListeners.get(event);
+    if (listeners) {
+      listeners.add(listener as (data: unknown) => void);
+    }
   }
 
   /**
@@ -46,7 +52,7 @@ export class RemoteTrack extends Track {
     // Only call base class emit for events that exist in TrackEvents
     const trackEvents: (keyof RemoteTrackEvents)[] = ['muted', 'unmuted', 'enabled', 'disabled'];
     if (trackEvents.includes(event)) {
-      super.emit(event as keyof import('../types').TrackEvents, data);
+      super.emit(event as keyof TrackEvents, data);
     }
 
     // Emit to remote listeners
@@ -56,7 +62,7 @@ export class RemoteTrack extends Track {
         try {
           listener(data);
         } catch (error) {
-          console.error(`Error in ${String(event)} listener:`, error);
+          logger.error(`Error in ${String(event)} listener`, { error });
         }
       });
     }

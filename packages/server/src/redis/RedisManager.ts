@@ -4,6 +4,9 @@
 
 import Redis from 'ioredis';
 import type { RedisConfig } from '../config';
+import { createModuleLogger } from '../utils/logger';
+
+const logger = createModuleLogger('redis');
 
 /**
  * RedisManager class
@@ -24,15 +27,15 @@ export class RedisManager {
     });
 
     this.client.on('error', (error: Error) => {
-      console.error('Redis error:', error);
+      logger.error({ error }, 'Redis error');
     });
 
     this.client.on('connect', () => {
-      console.log('Redis connected');
+      logger.info('Redis connected');
     });
 
     this.client.on('reconnecting', () => {
-      console.log('Redis reconnecting...');
+      logger.info('Redis reconnecting...');
     });
   }
 

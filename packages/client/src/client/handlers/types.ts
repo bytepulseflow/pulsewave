@@ -4,6 +4,7 @@
 
 import type { RoomClient } from '../RoomClient';
 import type { RoomEvents } from '../../types';
+import type { ServerMessage } from '@bytepulse/pulsewave-shared';
 
 /**
  * Context passed to message handlers
@@ -17,7 +18,7 @@ export interface HandlerContext {
  */
 export interface MessageHandler {
   type: string;
-  handle(context: HandlerContext, message: any): void;
+  handle(context: HandlerContext, message: ServerMessage | Record<string, unknown>): void;
 }
 
 /**

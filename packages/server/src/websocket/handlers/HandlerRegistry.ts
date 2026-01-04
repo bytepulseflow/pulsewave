@@ -6,6 +6,8 @@
  */
 
 import type { MessageHandler, HandlerContext } from './types';
+import type { ClientMessage } from '@bytepulse/pulsewave-shared';
+import { createModuleLogger } from '../../utils/logger';
 import { JoinHandler } from './JoinHandler';
 import { LeaveHandler } from './LeaveHandler';
 import { CreateWebRtcTransportHandler } from './CreateWebRtcTransportHandler';
@@ -17,6 +19,8 @@ import { UnsubscribeHandler } from './UnsubscribeHandler';
 import { ResumeConsumerHandler } from './ResumeConsumerHandler';
 import { MuteHandler } from './MuteHandler';
 import { DataHandler } from './DataHandler';
+
+const logger = createModuleLogger('handler-registry');
 
 export class HandlerRegistry {
   private handlers: Map<string, MessageHandler> = new Map();
@@ -80,18 +84,18 @@ export class HandlerRegistry {
   /**
    * Handle a message using the appropriate handler
    */
-  public async handle(context: HandlerContext, message: any): Promise<void> {
+  public async handle(context: HandlerContext, message: ClientMessage): Promise<void> {
     const handler = this.get(message.type);
 
     if (!handler) {
-      console.warn(`No handler registered for message type: ${message.type}`);
+      logger.warn(`No handler registered for message type: ${message.type}`);
       return;
     }
 
     try {
       await handler.handle(context, message);
     } catch (error) {
-      console.error(`Error handling message type ${message.type}:`, error);
+      logger.error({ error }, `Error handling message type ${message.type}`);
       // Send error to client
       if (context.ws.readyState === 1) {
         context.ws.send(

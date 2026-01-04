@@ -16,6 +16,9 @@ import { RemoteTrack as RemoteTrackImpl } from '../RemoteTrack';
 import { LocalTrack as LocalTrackImpl } from '../LocalTrack';
 import { LocalTrackPublicationImpl } from '../TrackPublication';
 import type { types } from 'mediasoup-client';
+import { createModuleLogger } from '../../utils/logger';
+
+const logger = createModuleLogger('track-controller');
 
 /**
  * Local track state
@@ -253,7 +256,7 @@ export class TrackController {
     // Add to participant store
     this.participantStore.addLocalTrack(publication);
 
-    console.log('Camera enabled, track SID:', sid);
+    logger.info('Camera enabled, track SID:', sid);
     return sid;
   }
 
@@ -271,7 +274,7 @@ export class TrackController {
       this.participantStore.removeLocalTrackByProducerId(producer.id);
     }
 
-    console.log('Camera disabled');
+    logger.info('Camera disabled');
   }
 
   /**
@@ -314,7 +317,7 @@ export class TrackController {
     // Add to participant store
     this.participantStore.addLocalTrack(publication);
 
-    console.log('Microphone enabled, track SID:', sid);
+    logger.info('Microphone enabled, track SID:', sid);
     return sid;
   }
 
@@ -332,6 +335,6 @@ export class TrackController {
       this.participantStore.removeLocalTrackByProducerId(producer.id);
     }
 
-    console.log('Microphone disabled');
+    logger.info('Microphone disabled');
   }
 }

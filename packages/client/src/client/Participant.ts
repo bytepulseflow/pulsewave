@@ -11,6 +11,9 @@ import type {
   TrackSubscribeOptions,
 } from '../types';
 import { RemoteTrackPublicationImpl } from './TrackPublication';
+import { createModuleLogger } from '../utils/logger';
+
+const logger = createModuleLogger('participant');
 
 /**
  * Base Participant implementation
@@ -47,12 +50,7 @@ export class ParticipantImpl implements Participant {
    * Handle track subscribed callback from publication
    */
   private handleTrackSubscribed(publication: RemoteTrackPublicationImpl): void {
-    console.log(
-      'Participant - Track subscribed:',
-      publication.sid,
-      'hasTrack:',
-      !!publication.track
-    );
+    logger.debug('Track subscribed', { sid: publication.sid, hasTrack: !!publication.track });
     this.emit('track-subscribed', publication);
   }
 
@@ -125,7 +123,10 @@ export class ParticipantImpl implements Participant {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());
     }
-    this.listeners.get(event)!.add(listener as (data: unknown) => void);
+    const listeners = this.listeners.get(event);
+    if (listeners) {
+      listeners.add(listener as (data: unknown) => void);
+    }
   }
 
   /**
@@ -148,7 +149,7 @@ export class ParticipantImpl implements Participant {
         try {
           listener(data);
         } catch (error) {
-          console.error(`Error in ${String(event)} listener:`, error);
+          logger.error(`Error in ${String(event)} listener`, { error });
         }
       });
     }

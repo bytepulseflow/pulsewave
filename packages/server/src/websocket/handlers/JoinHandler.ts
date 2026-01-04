@@ -7,6 +7,10 @@ import { validateToken } from '../../auth';
 import { BaseHandler } from './BaseHandler';
 import type { HandlerContext } from './types';
 import type { JoinMessage } from '@bytepulse/pulsewave-shared';
+import { createModuleLogger } from '../../utils/logger';
+import { Participant } from '../../sfu/Participant';
+
+const logger = createModuleLogger('handler:join');
 
 export class JoinHandler extends BaseHandler {
   public readonly type = CLIENT_EVENTS.JOIN;
@@ -21,7 +25,12 @@ export class JoinHandler extends BaseHandler {
       return;
     }
 
-    const claims = validation.claims!;
+    if (!validation.claims) {
+      this.sendError(context.ws, ErrorCode.Unauthorized, 'Invalid token claims');
+      return;
+    }
+
+    const claims = validation.claims;
 
     // Check if user has permission to join
     if (claims.video?.roomJoin === false) {
@@ -45,7 +54,6 @@ export class JoinHandler extends BaseHandler {
     }
 
     // Create participant
-    const { Participant } = await import('../../sfu/Participant');
     const participant = new Participant(
       room,
       claims.identity,
@@ -91,6 +99,6 @@ export class JoinHandler extends BaseHandler {
       context.ws.socketId
     );
 
-    console.log(`Participant ${participant.identity} joined room ${roomName}`);
+    logger.info(`Participant ${participant.identity} joined room ${roomName}`);
   }
 }

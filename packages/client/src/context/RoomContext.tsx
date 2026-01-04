@@ -11,8 +11,11 @@ import React, {
   ReactNode,
 } from 'react';
 import { ConnectionState } from '@bytepulse/pulsewave-shared';
-import type { RoomClientOptions, LocalParticipant, RemoteParticipant } from '../types';
+import type { RoomClientOptions, LocalParticipant, RemoteParticipant, Participant } from '../types';
 import { RoomClient } from '../client/RoomClient';
+import { createModuleLogger } from '../utils/logger';
+
+const logger = createModuleLogger('room-context');
 
 /**
  * Room context interface
@@ -141,7 +144,7 @@ export function RoomProvider({
         setLocalParticipant(null);
       });
 
-      roomClient.on('participant-joined', (participant: any) => {
+      roomClient.on('participant-joined', (participant: Participant) => {
         setParticipants((prev) => {
           // Check for duplicates by SID
           if (prev.some((p) => p.sid === participant.sid)) {
@@ -151,7 +154,7 @@ export function RoomProvider({
         });
       });
 
-      roomClient.on('participant-left', (participant: any) => {
+      roomClient.on('participant-left', (participant: Participant) => {
         setParticipants((prev) => prev.filter((p) => p.sid !== participant.sid));
       });
 
@@ -179,7 +182,8 @@ export function RoomProvider({
     try {
       await room.disconnect();
     } catch (err) {
-      console.error('Error disconnecting:', err);
+      const error = err as Error;
+      logger.error('Error disconnecting:', { error: error.message });
     } finally {
       setRoom(null);
       setConnectionState('disconnected' as ConnectionState);
@@ -197,7 +201,10 @@ export function RoomProvider({
 
     return () => {
       if (room) {
-        room.disconnect().catch(console.error);
+        room.disconnect().catch((err) => {
+          const error = err as Error;
+          logger.error('Error disconnecting on unmount:', { error: error.message });
+        });
       }
     };
   }, [autoConnect]);

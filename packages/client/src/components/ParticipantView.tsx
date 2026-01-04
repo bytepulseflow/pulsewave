@@ -3,9 +3,12 @@
  */
 
 import { useEffect, useState } from 'react';
-import type { Participant } from '../types';
+import type { Participant, TrackPublication } from '../types';
 import { VideoTrack } from './VideoTrack';
 import { AudioTrack } from './AudioTrack';
+import { createModuleLogger } from '../utils/logger';
+
+const logger = createModuleLogger('participant-view');
 
 interface ParticipantViewProps {
   participant: Participant;
@@ -35,16 +38,15 @@ export function ParticipantView({
   useEffect(() => {
     const updateTracks = () => {
       const currentTracks = participant.getTracks();
-      console.log(
-        'ParticipantView - Updating tracks for participant:',
-        participant.identity,
-        currentTracks.map((t) => ({
+      logger.debug('Updating tracks for participant:', {
+        identity: participant.identity,
+        tracks: currentTracks.map((t) => ({
           sid: t.sid,
           kind: t.kind,
           hasTrack: !!t.track,
           subscribed: t.subscribed,
-        }))
-      );
+        })),
+      });
       setTracks(currentTracks);
     };
 
@@ -52,23 +54,22 @@ export function ParticipantView({
     updateTracks();
 
     // Listen for track changes
-    const handleTrackPublished = (publication: any) => {
-      console.log('ParticipantView - Track published event:', publication);
+    const handleTrackPublished = (publication: TrackPublication) => {
+      logger.debug('Track published event:', { sid: publication.sid });
       updateTracks();
     };
 
-    const handleTrackSubscribed = (publication: any) => {
-      console.log(
-        'ParticipantView - Track subscribed event:',
-        publication.sid,
-        'hasTrack:',
-        !!publication.track
-      );
+    const handleTrackSubscribed = (publication: TrackPublication) => {
+      const hasTrack = 'track' in publication && publication.track !== null;
+      logger.debug('Track subscribed event:', {
+        sid: publication.sid,
+        hasTrack,
+      });
       updateTracks();
     };
 
     const handleTrackUnpublished = () => {
-      console.log('ParticipantView - Track unpublished event');
+      logger.debug('Track unpublished event');
       updateTracks();
     };
 
@@ -91,12 +92,10 @@ export function ParticipantView({
     .filter((t) => t.track && t.track.kind === 'audio')
     .map((t) => ({ track: t.track, sid: t.sid }));
 
-  console.log(
-    'ParticipantView render - videoTracks:',
-    videoTracks.length,
-    'audioTracks:',
-    audioTracks.length
-  );
+  logger.debug('Render', {
+    videoTracks: videoTracks.length,
+    audioTracks: audioTracks.length,
+  });
 
   const hasAudio = audioTracks.length > 0;
   const isAudioMuted = hasAudio && audioTracks.some((t) => t.track?.isMuted);

@@ -10,6 +10,9 @@ import type {
   DtlsParameters,
   RtpParameters,
 } from '@bytepulse/pulsewave-shared';
+import { createModuleLogger } from '../utils/logger';
+
+const logger = createModuleLogger('webrtc');
 
 // Use mediasoup-client types
 type MediasoupTransport = types.Transport;
@@ -87,21 +90,23 @@ export class WebRTCManager {
 
     try {
       // Convert shared types to mediasoup-client types
-      const mediasoupRtpCapabilities: any = {
+      // Type assertion needed because mediasoup-client has stricter type requirements
+      const mediasoupRtpCapabilities = {
         codecs: (rtpCapabilities.codecs || []).map((codec) => ({
           ...codec,
           kind: codec.kind as 'audio' | 'video',
+          preferredPayloadType: codec.preferredPayloadType || 0,
         })),
         headerExtensions: (rtpCapabilities.headerExtensions || []).map((ext) => ({
           ...ext,
           kind: 'audio' as const,
         })),
-      };
+      } as types.RtpCapabilities;
 
       await this.device.load({ routerRtpCapabilities: mediasoupRtpCapabilities });
-      console.log('Device loaded with RTP capabilities');
+      logger.info('Device loaded with RTP capabilities');
     } catch (error) {
-      console.error('Failed to load device:', error);
+      logger.error('Failed to load device', { error });
       throw new Error('Failed to initialize WebRTC device');
     }
   }
@@ -126,13 +131,14 @@ export class WebRTCManager {
       id: transportInfo.id,
       iceParameters: transportInfo.iceParameters,
       iceCandidates,
-      dtlsParameters: transportInfo.dtlsParameters as any,
+      // Type assertion needed because mediasoup-client has stricter DtlsParameters type
+      dtlsParameters: transportInfo.dtlsParameters as types.DtlsParameters,
       iceServers: this.config.iceServers,
       iceTransportPolicy: this.config.iceTransportPolicy,
     });
 
     this.setupTransportListeners(this.sendTransport, 'send');
-    console.log('Send transport created');
+    logger.info('Send transport created');
   }
 
   /**
@@ -155,13 +161,14 @@ export class WebRTCManager {
       id: transportInfo.id,
       iceParameters: transportInfo.iceParameters,
       iceCandidates,
-      dtlsParameters: transportInfo.dtlsParameters as any,
+      // Type assertion needed because mediasoup-client has stricter DtlsParameters type
+      dtlsParameters: transportInfo.dtlsParameters as types.DtlsParameters,
       iceServers: this.config.iceServers,
       iceTransportPolicy: this.config.iceTransportPolicy,
     });
 
     this.setupTransportListeners(this.recvTransport, 'recv');
-    console.log('Receive transport created');
+    logger.info('Receive transport created');
   }
 
   /**
@@ -307,7 +314,7 @@ export class WebRTCManager {
       this.unpublishTrack(producer.id);
     });
 
-    console.log(`Track published: ${producer.id} (${track.kind})`);
+    logger.info(`Track published: ${producer.id} (${track.kind})`);
     return producer;
   }
 
@@ -326,7 +333,7 @@ export class WebRTCManager {
         trackSid: producerId,
       });
 
-      console.log(`Track unpublished: ${producerId}`);
+      logger.info(`Track unpublished: ${producerId}`);
     }
   }
 
@@ -348,7 +355,8 @@ export class WebRTCManager {
       id: consumerInfo.id,
       producerId,
       kind: consumerInfo.kind as 'audio' | 'video',
-      rtpParameters: consumerInfo.rtpParameters as any,
+      // Type assertion needed because mediasoup-client has stricter RtpParameters type
+      rtpParameters: consumerInfo.rtpParameters as types.RtpParameters,
     });
 
     this.consumers.set(consumer.id, consumer);
@@ -356,7 +364,7 @@ export class WebRTCManager {
     // Resume the consumer
     await this.resumeConsumer(consumer.id);
 
-    console.log(`Track subscribed: ${consumer.id} (${consumer.kind})`);
+    logger.info(`Track subscribed: ${consumer.id} (${consumer.kind})`);
     return consumer;
   }
 
@@ -414,7 +422,7 @@ export class WebRTCManager {
         consumerId,
       });
 
-      console.log(`Track unsubscribed: ${consumerId}`);
+      logger.info(`Track unsubscribed: ${consumerId}`);
     }
   }
 
@@ -431,7 +439,7 @@ export class WebRTCManager {
         consumerId,
       });
 
-      console.log(`Consumer resumed: ${consumerId}`);
+      logger.info(`Consumer resumed: ${consumerId}`);
     }
   }
 
@@ -504,6 +512,6 @@ export class WebRTCManager {
       this.recvTransport = null;
     }
 
-    console.log('WebRTC manager closed');
+    logger.info('WebRTC manager closed');
   }
 }

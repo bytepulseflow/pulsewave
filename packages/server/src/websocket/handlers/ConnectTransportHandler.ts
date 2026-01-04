@@ -6,6 +6,9 @@ import { CLIENT_EVENTS } from '@bytepulse/pulsewave-shared';
 import { BaseHandler } from './BaseHandler';
 import type { HandlerContext } from './types';
 import type { ConnectTransportMessage } from '@bytepulse/pulsewave-shared';
+import { createModuleLogger } from '../../utils/logger';
+
+const logger = createModuleLogger('handler:connect');
 
 export class ConnectTransportHandler extends BaseHandler {
   public readonly type = CLIENT_EVENTS.CONNECT_TRANSPORT;
@@ -36,9 +39,9 @@ export class ConnectTransportHandler extends BaseHandler {
         transportId,
       });
 
-      console.log(`Transport connected: ${transportId}`);
+      logger.info(`Transport connected: ${transportId}`);
     } catch (error) {
-      console.error('Failed to connect transport:', error);
+      logger.error({ error }, 'Failed to connect transport');
       this.sendError(context.ws, 500, 'Failed to connect transport');
     }
   }

@@ -6,6 +6,9 @@ import { CLIENT_EVENTS } from '@bytepulse/pulsewave-shared';
 import { BaseHandler } from './BaseHandler';
 import type { HandlerContext } from './types';
 import type { DataMessage } from '@bytepulse/pulsewave-shared';
+import { createModuleLogger } from '../../utils/logger';
+
+const logger = createModuleLogger('handler:data');
 
 export class DataHandler extends BaseHandler {
   public readonly type = CLIENT_EVENTS.DATA;
@@ -39,9 +42,9 @@ export class DataHandler extends BaseHandler {
         context.ws.socketId
       );
 
-      console.log(`Data message received from ${participant.sid}: ${kind}`);
+      logger.debug(`Data message received from ${participant.sid}: ${kind}`);
     } catch (error) {
-      console.error('Failed to handle data message:', error);
+      logger.error({ error }, 'Failed to handle data message');
     }
   }
 }

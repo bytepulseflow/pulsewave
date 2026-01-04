@@ -2,26 +2,30 @@
  * Joined message handler
  */
 
-import type { ParticipantInfo, RtpCapabilities } from '@bytepulse/pulsewave-shared';
+import type { ParticipantInfo, JoinedMessage, ServerMessage } from '@bytepulse/pulsewave-shared';
 import type { TrackSubscribeOptions } from '../../types';
 import { BaseHandler } from './BaseHandler';
 import type { HandlerContext } from './types';
 import { LocalParticipantImpl } from '../LocalParticipant';
 import { RemoteParticipantImpl } from '../Participant';
 import type { RoomClient } from '../RoomClient';
+import { createModuleLogger } from '../../utils/logger';
+
+const logger = createModuleLogger('handler:joined');
 
 export class JoinedHandler extends BaseHandler {
   public readonly type = 'joined';
 
-  public handle(context: HandlerContext, message: Record<string, unknown>): void {
+  public handle(context: HandlerContext, message: ServerMessage | Record<string, unknown>): void {
+    const joinedMessage = message as unknown as JoinedMessage;
     const client = context.client as RoomClient;
 
     // Set room info and RTP capabilities
-    client.setRoomInfo(message.room as never);
-    client.setRtpCapabilities(message.rtpCapabilities as RtpCapabilities | null);
+    client.setRoomInfo(joinedMessage.room);
+    client.setRtpCapabilities(joinedMessage.rtpCapabilities ?? null);
 
     // Create local participant
-    const localParticipant = new LocalParticipantImpl(message.participant as ParticipantInfo);
+    const localParticipant = new LocalParticipantImpl(joinedMessage.participant);
     client.setLocalParticipant(localParticipant);
 
     localParticipant.setPublishDataCallback(async (data: unknown, kind: 'reliable' | 'lossy') => {
@@ -43,7 +47,7 @@ export class JoinedHandler extends BaseHandler {
     this.emit(context, 'local-participant-joined', localParticipant);
 
     // Add existing participants
-    (message.otherParticipants as ParticipantInfo[]).forEach((info: ParticipantInfo) => {
+    joinedMessage.otherParticipants.forEach((info: ParticipantInfo) => {
       const participant = new RemoteParticipantImpl(info);
       participant.setSubscribeCallback(
         async (sid: string, subscribed: boolean, options?: TrackSubscribeOptions) => {
@@ -64,9 +68,9 @@ export class JoinedHandler extends BaseHandler {
       client
         .ensureWebRTCInitialized()
         .then(() => client.subscribeToAllTracks())
-        .then(() => console.log('Auto-subscribed to all existing tracks'))
+        .then(() => logger.info('Auto-subscribed to all existing tracks'))
         .catch((error: Error) =>
-          console.error('Failed to auto-subscribe to existing tracks:', error)
+          logger.error('Failed to auto-subscribe to existing tracks', { error })
         );
     }
   }

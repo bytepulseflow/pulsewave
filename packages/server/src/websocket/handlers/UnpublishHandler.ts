@@ -6,6 +6,9 @@ import { CLIENT_EVENTS } from '@bytepulse/pulsewave-shared';
 import { BaseHandler } from './BaseHandler';
 import type { HandlerContext } from './types';
 import type { UnpublishMessage } from '@bytepulse/pulsewave-shared';
+import { createModuleLogger } from '../../utils/logger';
+
+const logger = createModuleLogger('handler:unpublish');
 
 export class UnpublishHandler extends BaseHandler {
   public readonly type = CLIENT_EVENTS.UNPUBLISH;
@@ -42,9 +45,9 @@ export class UnpublishHandler extends BaseHandler {
         context.ws.socketId
       );
 
-      console.log(`Track unpublished: ${trackSid}`);
+      logger.info(`Track unpublished: ${trackSid}`);
     } catch (error) {
-      console.error('Failed to unpublish track:', error);
+      logger.error({ error }, 'Failed to unpublish track');
     }
   }
 }

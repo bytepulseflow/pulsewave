@@ -13,6 +13,9 @@ import type {
 import { LocalTrack } from './LocalTrack';
 import { LocalTrackPublicationImpl } from './TrackPublication';
 import { MediaManager } from '../media/MediaManager';
+import { createModuleLogger } from '../utils/logger';
+
+const logger = createModuleLogger('local-participant');
 
 /**
  * LocalParticipant implementation
@@ -49,7 +52,7 @@ export class LocalParticipantImpl implements LocalParticipant {
     info.tracks.forEach((trackInfo) => {
       // Note: Local tracks are created by the client, not from server info
       // This is just a placeholder for tracks that were already published
-      const publication = new LocalTrackPublicationImpl(trackInfo, trackInfo.sid, null as any);
+      const publication = new LocalTrackPublicationImpl(trackInfo, trackInfo.sid, null);
       this.tracks.set(trackInfo.sid, publication);
     });
   }
@@ -295,7 +298,10 @@ export class LocalParticipantImpl implements LocalParticipant {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());
     }
-    this.listeners.get(event)!.add(listener as (data: unknown) => void);
+    const listeners = this.listeners.get(event);
+    if (listeners) {
+      listeners.add(listener as (data: unknown) => void);
+    }
   }
 
   /**
@@ -318,7 +324,7 @@ export class LocalParticipantImpl implements LocalParticipant {
         try {
           listener(data);
         } catch (error) {
-          console.error(`Error in ${String(event)} listener:`, error);
+          logger.error(`Error in ${String(event)} listener`, { error });
         }
       });
     }

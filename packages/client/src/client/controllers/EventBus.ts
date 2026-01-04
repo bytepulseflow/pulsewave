@@ -5,6 +5,9 @@
  */
 
 import type { RoomEvents } from '../../types';
+import { createModuleLogger } from '../../utils/logger';
+
+const logger = createModuleLogger('event-bus');
 
 /**
  * Event listener type
@@ -24,7 +27,10 @@ export class EventBus {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());
     }
-    this.listeners.get(event)!.add(listener as EventListener);
+    const listeners = this.listeners.get(event);
+    if (listeners) {
+      listeners.add(listener as EventListener);
+    }
   }
 
   /**
@@ -54,7 +60,7 @@ export class EventBus {
         try {
           listener(data);
         } catch (error) {
-          console.error(`Error in ${String(event)} listener:`, error);
+          logger.error(`Error in ${String(event)} listener`, { error });
         }
       });
     }

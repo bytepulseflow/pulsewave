@@ -6,6 +6,9 @@ import { CLIENT_EVENTS } from '@bytepulse/pulsewave-shared';
 import { BaseHandler } from './BaseHandler';
 import type { HandlerContext } from './types';
 import type { UnsubscribeMessage } from '@bytepulse/pulsewave-shared';
+import { createModuleLogger } from '../../utils/logger';
+
+const logger = createModuleLogger('handler:unsubscribe');
 
 export class UnsubscribeHandler extends BaseHandler {
   public readonly type = CLIENT_EVENTS.UNSUBSCRIBE;
@@ -31,9 +34,9 @@ export class UnsubscribeHandler extends BaseHandler {
       // Remove consumer
       participant.removeConsumer(consumerId);
 
-      console.log(`Track unsubscribed: ${consumerId}`);
+      logger.info(`Track unsubscribed: ${consumerId}`);
     } catch (error) {
-      console.error('Failed to unsubscribe from track:', error);
+      logger.error({ error }, 'Failed to unsubscribe from track');
     }
   }
 }

@@ -6,6 +6,9 @@
 
 import type { RoomClientOptions } from '../../types';
 import { ConnectionState } from '@bytepulse/pulsewave-shared';
+import { createModuleLogger } from '../../utils/logger';
+
+const logger = createModuleLogger('connection-controller');
 
 /**
  * Connection state listener type
@@ -193,7 +196,7 @@ export class ConnectionController {
       try {
         listener(state);
       } catch (error) {
-        console.error('Error in state listener:', error);
+        logger.error('Error in state listener', { error });
       }
     });
   }
@@ -206,7 +209,7 @@ export class ConnectionController {
       try {
         listener(error);
       } catch (err) {
-        console.error('Error in error listener:', err);
+        logger.error('Error in error listener', { error: err });
       }
     });
   }
