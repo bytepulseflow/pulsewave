@@ -5,11 +5,14 @@
  */
 
 import type { MessageHandler, HandlerContext, EmitFunction } from './types';
-import type { ServerMessage } from '@bytepulse/pulsewave-shared';
+import { ServerMessage } from '@bytepulse/pulsewave-shared';
 
 export abstract class BaseHandler implements MessageHandler {
   public abstract readonly type: string;
-  public abstract handle(context: HandlerContext, message: ServerMessage): void;
+  public abstract handle(
+    context: HandlerContext,
+    message: ServerMessage | Record<string, unknown>
+  ): void;
 
   /**
    * Emit an event through the client

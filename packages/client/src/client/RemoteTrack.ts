@@ -3,7 +3,7 @@
  */
 
 import type { TrackInfo } from '@bytepulse/pulsewave-shared';
-import type { RemoteTrackEvents } from '../types';
+import type { RemoteTrackEvents, TrackEvents } from '../types';
 import { Track } from './Track';
 import { createModuleLogger } from '../utils/logger';
 
@@ -52,7 +52,7 @@ export class RemoteTrack extends Track {
     // Only call base class emit for events that exist in TrackEvents
     const trackEvents: (keyof RemoteTrackEvents)[] = ['muted', 'unmuted', 'enabled', 'disabled'];
     if (trackEvents.includes(event)) {
-      super.emit(event as keyof import('../types').TrackEvents, data);
+      super.emit(event as keyof TrackEvents, data);
     }
 
     // Emit to remote listeners

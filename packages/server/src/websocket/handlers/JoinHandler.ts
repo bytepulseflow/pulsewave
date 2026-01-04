@@ -8,6 +8,7 @@ import { BaseHandler } from './BaseHandler';
 import type { HandlerContext } from './types';
 import type { JoinMessage } from '@bytepulse/pulsewave-shared';
 import { createModuleLogger } from '../../utils/logger';
+import { Participant } from '../../sfu/Participant';
 
 const logger = createModuleLogger('handler:join');
 
@@ -53,7 +54,6 @@ export class JoinHandler extends BaseHandler {
     }
 
     // Create participant
-    const { Participant } = await import('../../sfu/Participant');
     const participant = new Participant(
       room,
       claims.identity,
