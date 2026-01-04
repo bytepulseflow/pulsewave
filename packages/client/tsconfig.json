@@ -6,7 +6,7 @@
     "rootDir": "./src",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
-    "types": ["react", "react-dom"],
+    "types": ["react", "react-dom", "vitest/globals"],
     "noEmit": false
   },
   "include": ["src/**/*"],
