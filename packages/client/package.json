@@ -13,7 +13,8 @@
     "./components": {
       "types": "./dist/components/index.d.ts",
       "import": "./dist/components/index.js"
-    }
+    },
+    "./components/styles.css": "./dist/components/styles.css"
   },
   "files": [
     "dist",
@@ -33,7 +34,7 @@
   },
   "license": "MIT",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp -r src/components/styles.css dist/components/",
     "dev": "tsc --watch",
     "clean": "rm -rf dist",
     "lint": "eslint src --ext .ts,.tsx",

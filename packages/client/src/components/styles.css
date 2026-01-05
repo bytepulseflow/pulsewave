@@ -1,0 +1,770 @@
+/**
+ * PulseWave Component Styles
+ * Professional, dynamic, modern design for video conferencing components
+ */
+
+/* ============================================
+   CSS Variables
+   ============================================ */
+:root {
+  --pulsewave-color-primary: #6366f1;
+  --pulsewave-color-primary-hover: #4f46e5;
+  --pulsewave-color-secondary: #a855f7;
+  --pulsewave-color-secondary-hover: #9333ea;
+  --pulsewave-color-danger: #ef4444;
+  --pulsewave-color-danger-hover: #dc2626;
+  --pulsewave-color-success: #22c55e;
+  --pulsewave-color-warning: #f59e0b;
+  --pulsewave-color-background: #0f172a;
+  --pulsewave-color-surface: #1e293b;
+  --pulsewave-color-surface-hover: #334155;
+  --pulsewave-color-border: #334155;
+  --pulsewave-color-text: #f8fafc;
+  --pulsewave-color-text-secondary: #94a3b8;
+  --pulsewave-color-text-muted: #64748b;
+
+  --pulsewave-radius-sm: 4px;
+  --pulsewave-radius-md: 8px;
+  --pulsewave-radius-lg: 12px;
+  --pulsewave-radius-xl: 16px;
+  --pulsewave-radius-full: 9999px;
+
+  --pulsewave-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --pulsewave-shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --pulsewave-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --pulsewave-shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+
+  --pulsewave-transition-fast: 150ms ease;
+  --pulsewave-transition-normal: 250ms ease;
+  --pulsewave-transition-slow: 350ms ease;
+}
+
+/* ============================================
+   VideoTrack Component
+   ============================================ */
+.pulsewave-video-track-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--pulsewave-color-surface);
+  border-radius: var(--pulsewave-radius-lg);
+}
+
+.pulsewave-video-track-wrapper video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.pulsewave-video-track-wrapper video.pulsewave-video--cover {
+  object-fit: cover;
+}
+
+.pulsewave-video-track-wrapper video.pulsewave-video--fill {
+  object-fit: fill;
+}
+
+.pulsewave-video-skeleton {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(90deg, var(--pulsewave-color-surface) 25%, var(--pulsewave-color-surface-hover) 50%, var(--pulsewave-color-surface) 75%);
+  background-size: 200% 100%;
+  animation: pulsewave-skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes pulsewave-skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.pulsewave-video-error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--pulsewave-radius-md);
+  color: var(--pulsewave-color-text-muted);
+  background-color: var(--pulsewave-color-surface);
+}
+
+.pulsewave-video-error svg {
+  opacity: 0.5;
+}
+
+.pulsewave-video-error span {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* ============================================
+   AudioTrack Component
+   ============================================ */
+.pulsewave-audio-track-wrapper {
+  position: relative;
+}
+
+.pulsewave-audio-visualizer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--pulsewave-radius-sm);
+  background-color: rgba(99, 102, 241, 0.1);
+  border-radius: var(--pulsewave-radius-md);
+}
+
+.pulsewave-audio-visualizer canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ============================================
+   Avatar Component
+   ============================================ */
+.pulsewave-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--pulsewave-color-primary), var(--pulsewave-color-secondary));
+  color: white;
+  font-weight: 600;
+  border-radius: var(--pulsewave-radius-full);
+  box-shadow: var(--pulsewave-shadow-md);
+}
+
+.pulsewave-avatar--small {
+  width: 32px;
+  height: 32px;
+  font-size: 0.75rem;
+}
+
+.pulsewave-avatar--medium {
+  width: 48px;
+  height: 48px;
+  font-size: 1rem;
+}
+
+.pulsewave-avatar--large {
+  width: 80px;
+  height: 80px;
+  font-size: 1.5rem;
+}
+
+.pulsewave-avatar__initials {
+  text-transform: uppercase;
+}
+
+/* ============================================
+   Badge Component
+   ============================================ */
+.pulsewave-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: var(--pulsewave-radius-full);
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+  backdrop-filter: blur(8px);
+  box-shadow: var(--pulsewave-shadow-sm);
+}
+
+.pulsewave-badge--you {
+  background-color: var(--pulsewave-color-primary);
+  color: white;
+}
+
+.pulsewave-badge--mic-off {
+  background-color: rgba(239, 68, 68, 0.9);
+  color: white;
+}
+
+.pulsewave-badge--camera-off {
+  background-color: rgba(239, 68, 68, 0.9);
+  color: white;
+}
+
+.pulsewave-badge--connection {
+  background-color: rgba(34, 197, 94, 0.9);
+  color: white;
+}
+
+/* ============================================
+   Control Button Component
+   ============================================ */
+.pulsewave-control-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: var(--pulsewave-radius-full);
+  background-color: var(--pulsewave-color-surface);
+  color: var(--pulsewave-color-text);
+  cursor: pointer;
+  transition: all var(--pulsewave-transition-fast);
+  box-shadow: var(--pulsewave-shadow-md);
+}
+
+.pulsewave-control-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--pulsewave-shadow-lg);
+}
+
+.pulsewave-control-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.pulsewave-control-button--disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pulsewave-control-button--primary {
+  background-color: var(--pulsewave-color-surface);
+}
+
+.pulsewave-control-button--primary:hover:not(:disabled) {
+  background-color: var(--pulsewave-color-surface-hover);
+}
+
+.pulsewave-control-button--danger {
+  background-color: var(--pulsewave-color-danger);
+}
+
+.pulsewave-control-button--danger:hover:not(:disabled) {
+  background-color: var(--pulsewave-color-danger-hover);
+}
+
+.pulsewave-control-button--active {
+  background-color: var(--pulsewave-color-danger);
+}
+
+.pulsewave-control-button--active:hover:not(:disabled) {
+  background-color: var(--pulsewave-color-danger-hover);
+}
+
+.pulsewave-control-button__tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  background-color: var(--pulsewave-color-background);
+  color: var(--pulsewave-color-text);
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+  border-radius: var(--pulsewave-radius-md);
+  opacity: 0;
+  visibility: hidden;
+  transition: all var(--pulsewave-transition-fast);
+  pointer-events: none;
+  box-shadow: var(--pulsewave-shadow-lg);
+}
+
+.pulsewave-control-button:hover .pulsewave-control-button__tooltip {
+  opacity: 1;
+  visibility: visible;
+}
+
+.pulsewave-control-button svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* ============================================
+   LocalParticipantView Component
+   ============================================ */
+.pulsewave-local-participant {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--pulsewave-radius-md);
+  background-color: var(--pulsewave-color-background);
+  border-radius: var(--pulsewave-radius-xl);
+  overflow: hidden;
+  box-shadow: var(--pulsewave-shadow-lg);
+}
+
+.pulsewave-local-participant__media {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background-color: var(--pulsewave-color-surface);
+  overflow: hidden;
+}
+
+.pulsewave-local-participant__video {
+  width: 100%;
+  height: 100%;
+}
+
+.pulsewave-local-participant__placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--pulsewave-radius-md);
+  background: linear-gradient(135deg, var(--pulsewave-color-surface), var(--pulsewave-color-surface-hover));
+}
+
+.pulsewave-local-participant__placeholder-icon {
+  color: var(--pulsewave-color-text-muted);
+  opacity: 0.5;
+}
+
+.pulsewave-local-participant__badges {
+  position: absolute;
+  top: var(--pulsewave-radius-md);
+  right: var(--pulsewave-radius-md);
+  display: flex;
+  gap: var(--pulsewave-radius-sm);
+}
+
+.pulsewave-local-participant__controls {
+  position: absolute;
+  bottom: var(--pulsewave-radius-md);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: var(--pulsewave-radius-sm);
+  padding: var(--pulsewave-radius-sm);
+  background-color: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(12px);
+  border-radius: var(--pulsewave-radius-full);
+  box-shadow: var(--pulsewave-shadow-lg);
+}
+
+.pulsewave-local-participant__identity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pulsewave-radius-sm);
+  padding: var(--pulsewave-radius-md);
+  background-color: var(--pulsewave-color-surface);
+}
+
+.pulsewave-local-participant__name {
+  flex: 1;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--pulsewave-color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============================================
+   ParticipantView Component
+   ============================================ */
+.pulsewave-participant {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--pulsewave-radius-md);
+  background-color: var(--pulsewave-color-background);
+  border-radius: var(--pulsewave-radius-xl);
+  overflow: hidden;
+  box-shadow: var(--pulsewave-shadow-lg);
+  transition: all var(--pulsewave-transition-normal);
+}
+
+.pulsewave-participant--speaking {
+  box-shadow: 0 0 0 3px var(--pulsewave-color-primary), var(--pulsewave-shadow-xl);
+}
+
+.pulsewave-participant__media {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background-color: var(--pulsewave-color-surface);
+  overflow: hidden;
+}
+
+.pulsewave-participant__video {
+  width: 100%;
+  height: 100%;
+}
+
+.pulsewave-participant__placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--pulsewave-radius-md);
+  background: linear-gradient(135deg, var(--pulsewave-color-surface), var(--pulsewave-color-surface-hover));
+}
+
+.pulsewave-participant__placeholder-icon {
+  color: var(--pulsewave-color-text-muted);
+  opacity: 0.5;
+}
+
+.pulsewave-participant__indicators {
+  position: absolute;
+  top: var(--pulsewave-radius-md);
+  right: var(--pulsewave-radius-md);
+  display: flex;
+  gap: var(--pulsewave-radius-sm);
+}
+
+.pulsewave-participant__identity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pulsewave-radius-sm);
+  padding: var(--pulsewave-radius-md);
+  background-color: var(--pulsewave-color-surface);
+}
+
+.pulsewave-participant__name {
+  flex: 1;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--pulsewave-color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pulsewave-participant__speaking-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--pulsewave-color-primary);
+  animation: pulsewave-speaking-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulsewave-speaking-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* ============================================
+   SpeakingIndicator Component
+   ============================================ */
+.pulsewave-speaking-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  background-color: rgba(34, 197, 94, 0.2);
+  border-radius: var(--pulsewave-radius-full);
+  opacity: 0;
+  transition: opacity var(--pulsewave-transition-fast);
+}
+
+.pulsewave-speaking-indicator--active {
+  opacity: 1;
+}
+
+.pulsewave-speaking-indicator__bars {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 16px;
+}
+
+.pulsewave-speaking-indicator__bar {
+  width: 3px;
+  background-color: var(--pulsewave-color-success);
+  border-radius: var(--pulsewave-radius-full);
+  animation: pulsewave-speaking-bar 0.8s ease-in-out infinite;
+}
+
+.pulsewave-speaking-indicator__bar:nth-child(1) {
+  height: 8px;
+  animation-delay: 0s;
+}
+
+.pulsewave-speaking-indicator__bar:nth-child(2) {
+  height: 12px;
+  animation-delay: 0.1s;
+}
+
+.pulsewave-speaking-indicator__bar:nth-child(3) {
+  height: 16px;
+  animation-delay: 0.2s;
+}
+
+.pulsewave-speaking-indicator__bar:nth-child(4) {
+  height: 10px;
+  animation-delay: 0.3s;
+}
+
+@keyframes pulsewave-speaking-bar {
+  0%, 100% {
+    transform: scaleY(0.5);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+/* ============================================
+   RoomView Component
+   ============================================ */
+.pulsewave-room-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pulsewave-radius-lg);
+  width: 100%;
+  height: 100%;
+  background-color: var(--pulsewave-color-background);
+  border-radius: var(--pulsewave-radius-xl);
+  overflow: hidden;
+}
+
+.pulsewave-room-view__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pulsewave-radius-md);
+  padding: var(--pulsewave-radius-md) var(--pulsewave-radius-lg);
+  background-color: var(--pulsewave-color-surface);
+  border-bottom: 1px solid var(--pulsewave-color-border);
+}
+
+.pulsewave-room-view__participants {
+  flex: 1;
+  display: grid;
+  gap: var(--pulsewave-radius-lg);
+  padding: var(--pulsewave-radius-lg);
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.pulsewave-room-view--grid .pulsewave-room-view__participants {
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.pulsewave-room-view--list .pulsewave-room-view__participants {
+  grid-template-columns: 1fr;
+}
+
+.pulsewave-room-view--spotlight .pulsewave-room-view__participants {
+  grid-template-columns: 2fr 1fr;
+}
+
+.pulsewave-room-view__participant {
+  min-height: 0;
+}
+
+.pulsewave-room-view__participant--local {
+  grid-row: span 2;
+}
+
+.pulsewave-room-view__empty {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--pulsewave-radius-lg);
+  padding: var(--pulsewave-radius-xl);
+  text-align: center;
+}
+
+.pulsewave-room-view__empty-icon {
+  color: var(--pulsewave-color-text-muted);
+  opacity: 0.3;
+}
+
+.pulsewave-room-view__empty-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--pulsewave-color-text);
+  margin: 0;
+}
+
+.pulsewave-room-view__empty-description {
+  font-size: 0.875rem;
+  color: var(--pulsewave-color-text-secondary);
+  margin: 0;
+}
+
+/* ============================================
+   ConnectionStatus Component
+   ============================================ */
+.pulsewave-connection-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pulsewave-radius-sm);
+  padding: 6px 12px;
+  border-radius: var(--pulsewave-radius-full);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.pulsewave-connection-status--disconnected {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: var(--pulsewave-color-danger);
+}
+
+.pulsewave-connection-status--connecting {
+  background-color: rgba(245, 158, 11, 0.1);
+  color: var(--pulsewave-color-warning);
+}
+
+.pulsewave-connection-status--connected {
+  background-color: rgba(34, 197, 94, 0.1);
+  color: var(--pulsewave-color-success);
+}
+
+.pulsewave-connection-status--reconnecting {
+  background-color: rgba(245, 158, 11, 0.1);
+  color: var(--pulsewave-color-warning);
+}
+
+.pulsewave-connection-status__icon {
+  display: flex;
+  align-items: center;
+}
+
+.pulsewave-connection-status--connecting .pulsewave-connection-status__icon,
+.pulsewave-connection-status--reconnecting .pulsewave-connection-status__icon {
+  animation: pulsewave-connection-spin 1s linear infinite;
+}
+
+@keyframes pulsewave-connection-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ============================================
+   ParticipantCount Component
+   ============================================ */
+.pulsewave-participant-count {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pulsewave-radius-sm);
+  padding: 6px 12px;
+  background-color: var(--pulsewave-color-surface);
+  border-radius: var(--pulsewave-radius-full);
+  font-size: 0.875rem;
+  color: var(--pulsewave-color-text-secondary);
+}
+
+.pulsewave-participant-count__number {
+  font-weight: 600;
+  color: var(--pulsewave-color-text);
+}
+
+.pulsewave-participant-count__label {
+  color: var(--pulsewave-color-text-secondary);
+}
+
+/* ============================================
+   Responsive Design
+   ============================================ */
+@media (max-width: 768px) {
+  .pulsewave-room-view--spotlight .pulsewave-room-view__participants {
+    grid-template-columns: 1fr;
+  }
+
+  .pulsewave-room-view__participant--local {
+    grid-row: span 1;
+  }
+
+  .pulsewave-local-participant__controls {
+    bottom: var(--pulse-radius-sm);
+  }
+
+  .pulsewave-control-button {
+    width: 40px;
+    height: 40px;
+  }
+
+  .pulsewave-avatar--large {
+    width: 64px;
+    height: 64px;
+    font-size: 1.25rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .pulsewave-room-view__header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .pulsewave-room-view--grid .pulsewave-room-view__participants {
+    grid-template-columns: 1fr;
+  }
+
+  .pulsewave-badge {
+    font-size: 0.6875rem;
+    padding: 3px 6px;
+  }
+}
+
+/* ============================================
+   Dark Mode Support
+   ============================================ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --pulsewave-color-background: #0f172a;
+    --pulsewave-color-surface: #1e293b;
+    --pulsewave-color-surface-hover: #334155;
+    --pulsewave-color-border: #334155;
+    --pulsewave-color-text: #f8fafc;
+    --pulsewave-color-text-secondary: #94a3b8;
+    --pulsewave-color-text-muted: #64748b;
+  }
+}
+
+/* ============================================
+   Reduced Motion Support
+   ============================================ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ============================================
+   Print Styles
+   ============================================ */
+@media print {
+  .pulsewave-local-participant__controls,
+  .pulsewave-participant__indicators,
+  .pulsewave-room-view__header {
+    display: none !important;
+  }
+
+  .pulsewave-room-view {
+    box-shadow: none;
+    border: 1px solid var(--pulsewave-color-border);
+  }
+}
