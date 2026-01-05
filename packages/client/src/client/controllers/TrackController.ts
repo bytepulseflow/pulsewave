@@ -265,13 +265,16 @@ export class TrackController {
    * High-level method that handles cleanup
    */
   async disableCamera(): Promise<void> {
+    // Get producer ID BEFORE unpublishing (unpublish clears the state)
+    const producer = this.getLocalVideoProducer();
+    const producerId = producer?.id;
+
     // Unpublish via WebRTC
     await this.unpublishLocalTrack(TrackKind.Video);
 
     // Remove from participant store
-    const producer = this.getLocalVideoProducer();
-    if (producer) {
-      this.participantStore.removeLocalTrackByProducerId(producer.id);
+    if (producerId) {
+      this.participantStore.removeLocalTrackByProducerId(producerId);
     }
 
     logger.info('Camera disabled');
@@ -326,13 +329,16 @@ export class TrackController {
    * High-level method that handles cleanup
    */
   async disableMicrophone(): Promise<void> {
+    // Get producer ID BEFORE unpublishing (unpublish clears the state)
+    const producer = this.getLocalAudioProducer();
+    const producerId = producer?.id;
+
     // Unpublish via WebRTC
     await this.unpublishLocalTrack(TrackKind.Audio);
 
     // Remove from participant store
-    const producer = this.getLocalAudioProducer();
-    if (producer) {
-      this.participantStore.removeLocalTrackByProducerId(producer.id);
+    if (producerId) {
+      this.participantStore.removeLocalTrackByProducerId(producerId);
     }
 
     logger.info('Microphone disabled');

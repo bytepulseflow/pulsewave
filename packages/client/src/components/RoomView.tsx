@@ -4,6 +4,7 @@
 
 import { useMemo } from 'react';
 import { useParticipants, useLocalParticipant, useConnectionState } from '../hooks';
+import { useRoom } from '../context';
 
 import { ParticipantView } from './ParticipantView';
 import { LocalParticipantView } from './LocalParticipantView';
@@ -159,6 +160,7 @@ export function RoomView({
   const localParticipant = useLocalParticipant();
   const participants = useParticipants();
   const connectionState = useConnectionState();
+  const { room } = useRoom();
 
   // Calculate grid columns based on participant count
   const gridStyle = useMemo(() => {
@@ -194,6 +196,7 @@ export function RoomView({
           <div className="pulsewave-room-view__participant pulsewave-room-view__participant--local">
             <LocalParticipantView
               participant={localParticipant}
+              room={room}
               videoClassName={videoClassName}
               objectFit={objectFit}
               showIdentity={showIdentity}

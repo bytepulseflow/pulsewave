@@ -4,11 +4,13 @@
 
 import { useState, useEffect } from 'react';
 import type { LocalParticipant, LocalTrack } from '../types';
+import type { RoomClient } from '../client/RoomClient';
 import { VideoTrack } from './VideoTrack';
 import { AudioTrack } from './AudioTrack';
 
 interface LocalParticipantViewProps {
   participant: LocalParticipant;
+  room: RoomClient | null;
   className?: string;
   videoClassName?: string;
   objectFit?: 'contain' | 'cover' | 'fill';
@@ -61,6 +63,7 @@ function ControlButton({
  */
 export function LocalParticipantView({
   participant,
+  room,
   className = '',
   videoClassName = '',
   objectFit = 'contain',
@@ -72,12 +75,35 @@ export function LocalParticipantView({
   const [isCameraMuted, setIsCameraMuted] = useState(false);
   const [hasVideo, setHasVideo] = useState(false);
   const [hasAudio, setHasAudio] = useState(false);
+  const [isToggling, setIsToggling] = useState(false);
+  const [tracksVersion, setTracksVersion] = useState(0);
 
   const videoTracks = participant.getTracks().filter((t) => t.track && t.track.kind === 'video');
   const audioTracks = participant.getTracks().filter((t) => t.track && t.track.kind === 'audio');
 
   const mainVideoTrack: LocalTrack | undefined = videoTracks[0]?.track as LocalTrack;
   const mainAudioTrack: LocalTrack | undefined = audioTracks[0]?.track as LocalTrack;
+
+  // Listen for track changes to force re-render
+  useEffect(() => {
+    const handleTrackChange = () => {
+      setTracksVersion((v) => v + 1);
+      // Reset toggling state when tracks change
+      setIsToggling(false);
+    };
+
+    participant.on('track-published', handleTrackChange as () => void);
+    participant.on('track-unpublished', handleTrackChange as () => void);
+    participant.on('track-muted', handleTrackChange as () => void);
+    participant.on('track-unmuted', handleTrackChange as () => void);
+
+    return () => {
+      participant.off('track-published', handleTrackChange as () => void);
+      participant.off('track-unpublished', handleTrackChange as () => void);
+      participant.off('track-muted', handleTrackChange as () => void);
+      participant.off('track-unmuted', handleTrackChange as () => void);
+    };
+  }, [participant]);
 
   // Sync mute state with actual track state
   useEffect(() => {
@@ -86,8 +112,9 @@ export function LocalParticipantView({
       setHasAudio(true);
     } else {
       setHasAudio(false);
+      setIsMicMuted(false);
     }
-  }, [mainAudioTrack]);
+  }, [mainAudioTrack, tracksVersion]);
 
   useEffect(() => {
     if (mainVideoTrack) {
@@ -95,30 +122,52 @@ export function LocalParticipantView({
       setHasVideo(true);
     } else {
       setHasVideo(false);
+      setIsCameraMuted(false);
     }
-  }, [mainVideoTrack]);
+  }, [mainVideoTrack, tracksVersion]);
 
   const toggleMic = async (): Promise<void> => {
-    if (mainAudioTrack) {
-      const newState = !isMicMuted;
-      if (newState) {
-        await mainAudioTrack.mute();
+    if (isToggling || !room) return;
+
+    setIsToggling(true);
+    try {
+      if (hasAudio && mainAudioTrack) {
+        // Mute/unmute existing track
+        const newState = !isMicMuted;
+        if (newState) {
+          await mainAudioTrack.mute();
+        } else {
+          await mainAudioTrack.unmute();
+        }
+        setIsMicMuted(newState);
       } else {
-        await mainAudioTrack.unmute();
+        // Enable microphone
+        await room.enableMicrophone();
+        setIsMicMuted(false);
       }
-      setIsMicMuted(newState);
+    } catch (error) {
+      console.error('Error toggling microphone:', error);
+    } finally {
+      setIsToggling(false);
     }
   };
 
   const toggleCamera = async (): Promise<void> => {
-    if (mainVideoTrack) {
-      const newState = !isCameraMuted;
-      if (newState) {
-        await mainVideoTrack.mute();
+    if (isToggling || !room) return;
+
+    setIsToggling(true);
+    try {
+      if (hasVideo && mainVideoTrack) {
+        // Disable camera properly (not just mute)
+        await room.disableCamera();
       } else {
-        await mainVideoTrack.unmute();
+        // Enable camera
+        await room.enableCamera();
       }
-      setIsCameraMuted(newState);
+    } catch (error) {
+      console.error('Error toggling camera:', error);
+    } finally {
+      setIsToggling(false);
     }
   };
 
@@ -133,6 +182,10 @@ export function LocalParticipantView({
     .join('')
     .toUpperCase()
     .slice(0, 2);
+
+  // Determine button states
+  const isMicOff = !hasAudio || isMicMuted;
+  const isCameraOff = !hasVideo || isCameraMuted;
 
   return (
     <div className={`pulsewave-local-participant ${className}`}>
@@ -174,7 +227,7 @@ export function LocalParticipantView({
 
         {/* Status badges */}
         <div className="pulsewave-local-participant__badges">
-          {isCameraMuted && (
+          {isCameraOff && (
             <div className="pulsewave-badge pulsewave-badge--camera-off">
               <svg
                 width="16"
@@ -190,7 +243,7 @@ export function LocalParticipantView({
               </svg>
             </div>
           )}
-          {isMicMuted && (
+          {isMicOff && (
             <div className="pulsewave-badge pulsewave-badge--mic-off">
               <svg
                 width="16"
@@ -246,11 +299,11 @@ export function LocalParticipantView({
                 <line x1="8" y1="23" x2="16" y2="23" />
               </svg>
             }
-            isActive={isMicMuted}
-            isDisabled={!hasAudio}
+            isActive={isMicOff}
+            isDisabled={isToggling || !room}
             onClick={toggleMic}
-            label={isMicMuted ? 'Unmute microphone' : 'Mute microphone'}
-            variant={isMicMuted ? 'danger' : 'primary'}
+            label={isMicOff ? 'Enable microphone' : 'Mute microphone'}
+            variant={isMicOff ? 'danger' : 'primary'}
           />
           <ControlButton
             icon={
@@ -280,11 +333,11 @@ export function LocalParticipantView({
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
               </svg>
             }
-            isActive={isCameraMuted}
-            isDisabled={!hasVideo}
+            isActive={isCameraOff}
+            isDisabled={isToggling || !room}
             onClick={toggleCamera}
-            label={isCameraMuted ? 'Enable camera' : 'Disable camera'}
-            variant={isCameraMuted ? 'danger' : 'primary'}
+            label={isCameraOff ? 'Enable camera' : 'Disable camera'}
+            variant={isCameraOff ? 'danger' : 'primary'}
           />
         </div>
       )}
