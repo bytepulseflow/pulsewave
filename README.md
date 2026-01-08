@@ -17,11 +17,23 @@ A modern WebRTC conferencing solution built on top of [mediasoup](https://medias
 
 ## Packages
 
-| Package                       | Description                                | Status      |
-| ----------------------------- | ------------------------------------------ | ----------- |
-| `@bytepulse/pulsewave-client` | React client SDK with hooks and components | ✅ Complete |
-| `@bytepulse/pulsewave-server` | Mediasoup SFU server (Docker)              | ✅ Complete |
-| `@bytepulse/pulsewave-shared` | Shared types and constants                 | ✅ Complete |
+| Package                       | Description                                | Status      | NPM                                                                                                                               |
+| ----------------------------- | ------------------------------------------ | ----------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `@bytepulse/pulsewave-client` | React client SDK with hooks and components | ✅ Complete | [![npm](https://img.shields.io/npm/v/@bytepulse/pulsewave-client.svg)](https://www.npmjs.com/package/@bytepulse/pulsewave-client) |
+| `@bytepulse/pulsewave-server` | Mediasoup SFU server (Docker)              | ✅ Complete | [![npm](https://img.shields.io/npm/v/@bytepulse/pulsewave-server.svg)](https://www.npmjs.com/package/@bytepulse/pulsewave-server) |
+| `@bytepulse/pulsewave-shared` | Shared types and constants                 | ✅ Complete | -                                                                                                                                 |
+
+## Installation
+
+### Client SDK
+
+```bash
+npm install @bytepulse/pulsewave-client
+```
+
+Visit [npmjs.com/package/@bytepulse/pulsewave-client](https://www.npmjs.com/package/@bytepulse/pulsewave-client) for detailed client SDK documentation.
+
+Visit [npmjs.com/package/@bytepulse/pulsewave-server](https://www.npmjs.com/package/@bytepulse/pulsewave-server) for detailed server documentation.
 
 ## Quick Start
 
@@ -29,7 +41,7 @@ A modern WebRTC conferencing solution built on top of [mediasoup](https://medias
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/pulsewave.git
+git clone https://github.com/bytepulseflow/pulsewave
 cd pulsewave
 
 # Start with docker-compose
@@ -46,188 +58,7 @@ The server will be available at `http://localhost:3000`
 npm install @bytepulse/pulsewave-client
 ```
 
-```tsx
-import {
-  RoomProvider,
-  useRoom,
-  useLocalParticipant,
-  useParticipants,
-  RoomView,
-} from '@bytepulse/pulsewave-client';
-
-function VideoRoom() {
-  const room = useRoom();
-  const localParticipant = useLocalParticipant();
-  const participants = useParticipants();
-
-  return (
-    <div>
-      <button onClick={() => localParticipant.enableCamera()}>Enable Camera</button>
-      <button onClick={() => localParticipant.enableMicrophone()}>Enable Microphone</button>
-
-      <RoomView />
-    </div>
-  );
-}
-
-function App() {
-  return (
-    <RoomProvider
-      options={{
-        url: 'wss://pulsewave.example.com',
-        room: 'my-room',
-        token: accessToken,
-      }}
-    >
-      <VideoRoom />
-    </RoomProvider>
-  );
-}
-```
-
-## Client SDK API
-
-### RoomProvider
-
-The main entry point for using the client SDK.
-
-```tsx
-<RoomProvider
-  options={{
-    url: 'wss://pulsewave.example.com',
-    room: 'my-room',
-    token: accessToken,
-  }}
->
-  <YourRoomComponent />
-</RoomProvider>
-```
-
-### React Hooks
-
-#### `useRoom()`
-
-Access the room instance and manage connection.
-
-```tsx
-const { connect, disconnect } = useRoom();
-
-connect();
-disconnect();
-```
-
-#### `useLocalParticipant()`
-
-Access and control the local participant.
-
-```tsx
-const localParticipant = useLocalParticipant();
-
-// Media controls
-localParticipant.enableCamera(deviceId?);
-localParticipant.disableCamera();
-localParticipant.enableMicrophone(deviceId?);
-localParticipant.disableMicrophone();
-
-// Device listing
-const cameras = await localParticipant.listAvailableCameras();
-const microphones = await localParticipant.listAvailableMicrophones();
-
-// Properties
-localParticipant.name;
-localParticipant.identity;
-localParticipant.tracks;
-```
-
-#### `useParticipants()`
-
-Get all remote participants in the room.
-
-```tsx
-const participants = useParticipants();
-
-participants.map((p) => <ParticipantView key={p.identity} participant={p} />);
-```
-
-#### `useConnectionState()`
-
-Monitor connection state.
-
-```tsx
-const state = useConnectionState();
-// 'connected' | 'connecting' | 'disconnected' | 'reconnecting'
-```
-
-### Components
-
-#### `RoomView`
-
-A pre-built component that displays all participants and their tracks.
-
-```tsx
-<RoomView />
-```
-
-#### `ParticipantView`
-
-Display a single participant with their tracks.
-
-```tsx
-<ParticipantView participant={participant} />
-```
-
-## Server Configuration
-
-### Environment Variables
-
-```bash
-# Server
-PORT=3000
-HOST=0.0.0.0
-
-# Mediasoup
-MEDIASOUP_NUM_WORKERS=4
-MEDIASOUP_MIN_PORT=40000
-MEDIASOUP_MAX_PORT=50000
-MEDIASOUP_LOG_LEVEL=error
-
-# Redis
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_ENABLED=true
-
-# JWT
-API_KEY=your-api-key
-API_SECRET=your-api-secret
-JWT_EXPIRES_IN=24h
-
-# ICE Servers
-ICE_SERVERS=[{"urls":["stun:stun.l.google.com:19302"]}]
-```
-
-### Token Generation
-
-Generate access tokens on your backend:
-
-```typescript
-import { AccessToken } from '@bytepulse/pulsewave-server';
-
-const token = new AccessToken(API_KEY, API_SECRET, {
-  identity: 'user-123',
-  name: 'John Doe',
-  metadata: { role: 'host' },
-});
-
-token.addGrant({
-  room: 'room-name',
-  roomJoin: true,
-  canPublish: true,
-  canSubscribe: true,
-  canPublishData: true,
-});
-
-const jwt = token.toJwt();
-```
+For detailed usage examples and API documentation, visit the [Client SDK Documentation](https://www.npmjs.com/package/@bytepulse/pulsewave-client).
 
 ## Architecture
 
