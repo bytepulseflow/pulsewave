@@ -2,6 +2,9 @@
  * Main entry point for pulsewave-client client
  */
 
+// Import component styles
+import './components/styles.css';
+
 // Export client classes
 export { RoomClient } from './client';
 export { Track } from './client/Track';

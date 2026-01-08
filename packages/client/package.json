@@ -1,6 +1,6 @@
 {
   "name": "@bytepulse/pulsewave-client",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "PulseWave Client SDK - React hooks and components for WebRTC video/audio",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -10,10 +10,15 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./ui": {
+      "types": "./dist/ui/index.d.ts",
+      "import": "./dist/ui/index.js"
+    },
     "./components": {
       "types": "./dist/components/index.d.ts",
       "import": "./dist/components/index.js"
-    }
+    },
+    "./components/styles.css": "./dist/components/styles.css"
   },
   "files": [
     "dist",
@@ -33,7 +38,7 @@
   },
   "license": "MIT",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp -r src/components/styles.css dist/components/ && cp -r src/ui dist/",
     "dev": "tsc --watch",
     "clean": "rm -rf dist",
     "lint": "eslint src --ext .ts,.tsx",

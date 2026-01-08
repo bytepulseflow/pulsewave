@@ -1,5 +1,7 @@
 # @bytepulse/pulsewave-server
 
+> **⚠️ WARNING: This project is still under active development and testing. Do not use in production environments.**
+
 Mediasoup SFU server for PulseWave. Provides WebRTC signaling and media routing for video/audio conferencing.
 
 ## Installation
