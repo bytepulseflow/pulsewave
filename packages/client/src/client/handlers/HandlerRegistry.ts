@@ -16,6 +16,8 @@ import { TrackSubscribedHandler } from './TrackSubscribedHandler';
 import { TrackUnsubscribedHandler } from './TrackUnsubscribedHandler';
 import { TrackMutedHandler } from './TrackMutedHandler';
 import { TrackUnmutedHandler } from './TrackUnmutedHandler';
+import { TransportCreatedHandler } from './TransportCreatedHandler';
+import { TransportConnectedHandler } from './TransportConnectedHandler';
 import { DataHandler } from './DataHandler';
 import { ErrorHandler } from './ErrorHandler';
 import { createModuleLogger } from '../../utils/logger';
@@ -42,6 +44,8 @@ export class HandlerRegistry {
     this.register(new TrackUnsubscribedHandler());
     this.register(new TrackMutedHandler());
     this.register(new TrackUnmutedHandler());
+    this.register(new TransportCreatedHandler());
+    this.register(new TransportConnectedHandler());
     this.register(new DataHandler());
     this.register(new ErrorHandler());
   }

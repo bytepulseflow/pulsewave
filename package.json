@@ -1,7 +1,6 @@
 {
   "name": "pulsewave",
-  "version": "0.1.0",
-  "private": true,
+  "version": "0.1.1",
   "description": "PulseWave - A modern WebRTC conferencing solution built on mediasoup",
   "scripts": {
     "dev": "turbo run dev",
