@@ -1,5 +1,11 @@
 # @bytepulse/pulsewave-shared
 
+## 0.2.2
+
+### Patch Changes
+
+- fixed invlaid workspace bug
+
 ## 0.2.1
 
 ### Patch Changes
