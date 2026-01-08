@@ -1,5 +1,7 @@
 # @bytepulse/pulsewave-client
 
+> **⚠️ WARNING: This project is still under active development and testing. Do not use in production environments.**
+
 React client SDK for PulseWave. Provides simple hooks and components for building video/audio conferencing applications.
 
 ## Installation
@@ -10,25 +12,259 @@ npm install @bytepulse/pulsewave-client
 
 ## Quick Start
 
+PulseWave Client SDK provides two approaches for building video/audio applications:
+
+### Option 1: Hooks-Based API Usage
+
+Build custom UI using hooks for full control:
+
 ```tsx
-import { RoomProvider, useRoom, useLocalParticipant } from '@bytepulse/pulsewave-client';
+import { useState } from 'react';
+import {
+  RoomProvider,
+  useRoom,
+  useLocalParticipant,
+  useParticipants,
+  useConnectionState,
+} from '@bytepulse/pulsewave-client';
+import { VideoTrack, AudioTrack } from '@bytepulse/pulsewave-client/ui';
 
 function VideoRoom() {
   const { connect, disconnect } = useRoom();
   const localParticipant = useLocalParticipant();
+  const participants = useParticipants();
+  const connectionState = useConnectionState();
+
+  const toggleCamera = async () => {
+    if (localParticipant) {
+      const hasVideo = localParticipant.getTracks().some((t) => t.kind === 'video');
+      if (hasVideo) {
+        await localParticipant.disableCamera();
+      } else {
+        await localParticipant.enableCamera();
+      }
+    }
+  };
+
+  const toggleMicrophone = async () => {
+    if (localParticipant) {
+      const hasAudio = localParticipant.getTracks().some((t) => t.kind === 'audio');
+      if (hasAudio) {
+        await localParticipant.disableMicrophone();
+      } else {
+        await localParticipant.enableMicrophone();
+      }
+    }
+  };
+
+  return (
+    <div className="video-room">
+      <div className="controls">
+        <button onClick={connect} disabled={connectionState === 'connected'}>
+          Join Room
+        </button>
+        <button onClick={disconnect} disabled={connectionState === 'disconnected'}>
+          Leave Room
+        </button>
+        <button onClick={toggleCamera}>Toggle Camera</button>
+        <button onClick={toggleMicrophone}>Toggle Mic</button>
+      </div>
+
+      {connectionState === 'connected' && (
+        <div className="participants">
+          {/* Local Participant */}
+          {localParticipant && (
+            <div className="participant local">
+              <h3>You ({localParticipant.name})</h3>
+              {localParticipant.getTracks().map((publication) => (
+                <div key={publication.sid}>
+                  {publication.track && publication.kind === 'video' && (
+                    <VideoTrack track={publication.track} muted={true} />
+                  )}
+                  {publication.track && publication.kind === 'audio' && (
+                    <AudioTrack track={publication.track} />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Remote Participants */}
+          {participants.map((participant) => (
+            <div key={participant.identity} className="participant">
+              <h3>{participant.name}</h3>
+              {participant.getTracks().map((publication) => (
+                <div key={publication.sid}>
+                  {publication.track && publication.kind === 'video' && (
+                    <VideoTrack track={publication.track} />
+                  )}
+                  {publication.track && publication.kind === 'audio' && (
+                    <AudioTrack track={publication.track} />
+                  )}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function App() {
+  const [username, setUsername] = useState('');
+  const [roomName, setRoomName] = useState('');
+  const [token, setToken] = useState('');
+  const [isJoined, setIsJoined] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const generateToken = async (identity: string, room: string, name: string) => {
+    try {
+      const response = await fetch('http://localhost:3000/api/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          identity,
+          name,
+          room,
+          canPublish: true,
+          canSubscribe: true,
+          canPublishData: true,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate token');
+      }
+
+      const data = await response.json();
+      return data.token;
+    } catch (err) {
+      throw new Error('Failed to generate access token. Please ensure the server is running.');
+    }
+  };
+
+  const handleJoin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!username || !roomName) {
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const generatedToken = await generateToken(username, roomName, username);
+      setToken(generatedToken);
+      setIsJoined(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLeave = () => {
+    setIsJoined(false);
+    setToken('');
+    setError('');
+  };
 
   return (
     <div>
-      <button onClick={connect}>Join Room</button>
-      <button onClick={disconnect}>Leave Room</button>
-      <button onClick={() => localParticipant?.enableCamera()}>Enable Camera</button>
+      {!isJoined ? (
+        <form onSubmit={handleJoin} className="join-form">
+          <h2>Join a Room</h2>
+          {error && <div className="error">{error}</div>}
+          <div>
+            <label htmlFor="username">Username:</label>
+            <input
+              id="username"
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Enter your name"
+              required
+              disabled={isLoading}
+            />
+          </div>
+          <div>
+            <label htmlFor="roomName">Room Name:</label>
+            <input
+              id="roomName"
+              type="text"
+              value={roomName}
+              onChange={(e) => setRoomName(e.target.value)}
+              placeholder="Enter room name"
+              required
+              disabled={isLoading}
+            />
+          </div>
+          <button type="submit" disabled={isLoading}>
+            {isLoading ? 'Generating Token...' : 'Join'}
+          </button>
+        </form>
+      ) : (
+        <RoomProvider
+          options={{
+            url: 'ws://localhost:3000',
+            room: roomName,
+            token: token,
+          }}
+        >
+          <VideoRoom />
+          <button onClick={handleLeave}>Leave Room</button>
+        </RoomProvider>
+      )}
+    </div>
+  );
+}
+```
+
+### Option 2: Built-in Component-Based Usage
+
+Use the pre-built components for quick setup with minimal code:
+
+```tsx
+import { useRoom } from '@bytepulse/pulsewave-client';
+import { RoomProvider, RoomView, LocalParticipantView } from '@bytepulse/pulsewave-client/ui';
+
+function VideoRoom() {
+  const { connect, disconnect, connectionState } = useRoom();
+
+  return (
+    <div>
+      <div className="controls">
+        <button onClick={connect} disabled={connectionState === 'connected'}>
+          Join Room
+        </button>
+        <button onClick={disconnect} disabled={connectionState === 'disconnected'}>
+          Leave Room
+        </button>
+      </div>
+
+      {connectionState === 'connected' && (
+        <div className="room">
+          <LocalParticipantView />
+          <RoomView />
+        </div>
+      )}
     </div>
   );
 }
 
 function App() {
   return (
-    <RoomProvider options={{ url: 'ws://localhost:3000', room: 'my-room', token: 'your-token' }}>
+    <RoomProvider
+      options={{
+        url: 'ws://localhost:3000',
+        room: 'my-room',
+        token: 'your-token',
+      }}
+    >
       <VideoRoom />
     </RoomProvider>
   );
@@ -37,11 +273,26 @@ function App() {
 
 ## Components
 
+All UI components can be imported from `@bytepulse/pulsewave-client/ui`:
+
+```tsx
+import {
+  RoomProvider,
+  RoomView,
+  ParticipantView,
+  LocalParticipantView,
+  VideoTrack,
+  AudioTrack,
+} from '@bytepulse/pulsewave-client/ui';
+```
+
 ### RoomProvider
 
 The main provider component that wraps your application and provides room context.
 
 ```tsx
+import { RoomProvider } from '@bytepulse/pulsewave-client/ui';
+
 <RoomProvider
   options={{
     url: 'ws://localhost:3000',
@@ -50,7 +301,7 @@ The main provider component that wraps your application and provides room contex
   }}
 >
   <YourApp />
-</RoomProvider>
+</RoomProvider>;
 ```
 
 ### VideoTrack
@@ -58,7 +309,9 @@ The main provider component that wraps your application and provides room contex
 Component for rendering video tracks.
 
 ```tsx
-<VideoTrack track={track} className="w-full" objectFit="cover" muted={true} />
+import { VideoTrack } from '@bytepulse/pulsewave-client/ui';
+
+<VideoTrack track={track} className="w-full" objectFit="cover" muted={true} />;
 ```
 
 ### AudioTrack
@@ -66,7 +319,9 @@ Component for rendering video tracks.
 Component for rendering audio tracks (hidden).
 
 ```tsx
-<AudioTrack track={track} />
+import { AudioTrack } from '@bytepulse/pulsewave-client/ui';
+
+<AudioTrack track={track} />;
 ```
 
 ### ParticipantView
@@ -74,7 +329,9 @@ Component for rendering audio tracks (hidden).
 Component for rendering a participant with their tracks.
 
 ```tsx
-<ParticipantView participant={participant} />
+import { ParticipantView } from '@bytepulse/pulsewave-client/ui';
+
+<ParticipantView participant={participant} />;
 ```
 
 ### LocalParticipantView
@@ -82,7 +339,9 @@ Component for rendering a participant with their tracks.
 Component for rendering local participant with controls.
 
 ```tsx
-<LocalParticipantView participant={localParticipant} />
+import { LocalParticipantView } from '@bytepulse/pulsewave-client/ui';
+
+<LocalParticipantView participant={localParticipant} />;
 ```
 
 ### RoomView
@@ -90,7 +349,9 @@ Component for rendering local participant with controls.
 Component for rendering all participants in a room.
 
 ```tsx
-<RoomView />
+import { RoomView } from '@bytepulse/pulsewave-client/ui';
+
+<RoomView />;
 ```
 
 ## Hooks

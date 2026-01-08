@@ -10,6 +10,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./ui": {
+      "types": "./dist/ui/index.d.ts",
+      "import": "./dist/ui/index.js"
+    },
     "./components": {
       "types": "./dist/components/index.d.ts",
       "import": "./dist/components/index.js"
@@ -34,7 +38,7 @@
   },
   "license": "MIT",
   "scripts": {
-    "build": "tsc && cp -r src/components/styles.css dist/components/",
+    "build": "tsc && cp -r src/components/styles.css dist/components/ && cp -r src/ui dist/",
     "dev": "tsc --watch",
     "clean": "rm -rf dist",
     "lint": "eslint src --ext .ts,.tsx",
