@@ -1,6 +1,6 @@
 {
   "name": "@bytepulse/pulsewave-client",
-  "version": "0.3.2",
+  "version": "0.3.4",
   "description": "PulseWave Client SDK - React hooks and components for WebRTC video/audio",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -50,7 +50,7 @@
     "react-dom": "^19.2.0"
   },
   "dependencies": {
-    "@bytepulse/pulsewave-shared": "workspace:*",
+    "@bytepulse/pulsewave-shared": "^0.2.2",
     "mediasoup-client": "^3.7.10"
   },
   "devDependencies": {

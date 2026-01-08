@@ -1,6 +1,6 @@
 {
   "name": "@bytepulse/pulsewave-server",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "PulseWave Server SDK - Mediasoup SFU server deployable via Docker or self-hosted",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -48,7 +48,7 @@
     "test": "vitest"
   },
   "dependencies": {
-    "@bytepulse/pulsewave-shared": "workspace:*",
+    "@bytepulse/pulsewave-shared": "^0.2.1",
     "mediasoup": "^3.14.4",
     "ws": "^8.16.0",
     "jsonwebtoken": "^9.0.2",
