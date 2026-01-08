@@ -139,8 +139,6 @@ WebSocketServer
 └─ RoomManager      (Room lifecycle)
 ```
 
-See [`plans/architecture.md`](plans/architecture.md) for detailed architecture documentation.
-
 ## Development
 
 ### Prerequisites
@@ -205,16 +203,11 @@ pnpm release
 
 ## Contributing
 
-Contributions are welcome! Please read our contributing guidelines before submitting PRs.
+Contributions are welcome!
 
 ## License
 
 MIT
-
-## Support
-
-- GitHub Issues: [github.com/your-org/pulsewave/issues](https://github.com/your-org/pulsewave/issues)
-- Documentation: [docs.pulsewave.dev](https://docs.pulsewave.dev)
 
 ## Acknowledgments
 
