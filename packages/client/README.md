@@ -10,6 +10,99 @@ React client SDK for PulseWave. Provides simple hooks and components for buildin
 npm install @bytepulse/pulsewave-client
 ```
 
+## Server Setup
+
+The PulseWave client SDK requires a running PulseWave server. You can set up the server in two ways:
+
+### Option 1: Using Docker (Recommended)
+
+```bash
+# Clone the repository
+git clone https://github.com/bytepulseflow/pulsewave.git
+cd pulsewave
+
+# Start the server with docker-compose
+cd packages/server
+docker-compose up -d
+```
+
+The server will be available at `http://localhost:3000`
+
+### Option 2: Manual Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/bytepulseflow/pulsewave.git
+cd pulsewave
+
+# Install dependencies
+cd packages/server
+npm install
+
+# Copy environment file
+cp .env.example .env
+
+# Edit .env with your configuration
+# Required: API_KEY and API_SECRET for token generation
+
+# Start the server
+npm start
+```
+
+### Environment Variables
+
+The server requires the following environment variables:
+
+```bash
+# Server
+PORT=3000
+HOST=0.0.0.0
+
+# JWT (Required)
+API_KEY=your-api-key
+API_SECRET=your-api-secret
+
+# Mediasoup
+MEDIASOUP_NUM_WORKERS=4
+MEDIASOUP_MIN_PORT=40000
+MEDIASOUP_MAX_PORT=50000
+
+# Redis (Optional)
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_ENABLED=false
+
+# ICE Servers
+ICE_SERVERS=[{"urls":["stun:stun.l.google.com:19302"]}]
+```
+
+### Token Generation
+
+The client SDK requires an access token to join rooms. You can generate tokens using the server's API:
+
+```bash
+curl -X POST http://localhost:3000/api/token \
+  -H "Content-Type: application/json" \
+  -d '{
+    "identity": "user-123",
+    "name": "John Doe",
+    "room": "my-room",
+    "canPublish": true,
+    "canSubscribe": true,
+    "canPublishData": true
+  }'
+```
+
+Response:
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+For more server documentation, visit the [PulseWave Server GitHub Repository](https://github.com/bytepulseflow/pulsewave/tree/main/packages/server).
+
 ## Quick Start
 
 PulseWave Client SDK provides two approaches for building video/audio applications:

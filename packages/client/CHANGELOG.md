@@ -1,5 +1,13 @@
 # @bytepulse/pulsewave-client
 
+## 0.3.3
+
+### Patch Changes
+
+- fixed invlaid workspace bug
+- Updated dependencies
+  - @bytepulse/pulsewave-shared@0.2.2
+
 ## 0.3.2
 
 ### Patch Changes
