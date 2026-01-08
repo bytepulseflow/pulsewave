@@ -1,5 +1,6 @@
 services:
   pulsewave:
+    platform: linux/amd64
     image: kaushall22/pulsewave-server:0.2.2
     container_name: pulsewave-server
     ports:
