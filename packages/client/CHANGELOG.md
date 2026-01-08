@@ -1,5 +1,13 @@
 # @bytepulse/pulsewave-client
 
+## 0.3.2
+
+### Patch Changes
+
+- Built-in components addition
+- Updated dependencies
+  - @bytepulse/pulsewave-shared@0.2.1
+
 ## 0.3.0
 
 ### Minor Changes

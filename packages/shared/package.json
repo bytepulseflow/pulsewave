@@ -1,6 +1,6 @@
 {
   "name": "@bytepulse/pulsewave-shared",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "PulseWave Shared - Types and constants shared between client and server",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
