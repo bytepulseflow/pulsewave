@@ -26,8 +26,8 @@ COPY packages/shared ./packages/shared
 # Copy server package
 COPY packages/server ./packages/server
 
-# Install all dependencies
-RUN pnpm install --frozen-lockfile
+# Install all dependencies with hoisting for production
+RUN pnpm install --frozen-lockfile --shamefully-hoist
 
 # Build shared package first
 RUN pnpm --filter @bytepulse/pulsewave-shared build
@@ -64,10 +64,6 @@ USER mediasoup
 
 # Expose API port (UDP handled by compose)
 EXPOSE 3000
-
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:3000/health', r => process.exit(r.statusCode === 200 ? 0 : 1))"
 
 # Start server
 CMD ["node", "packages/server/dist/index.js"]
