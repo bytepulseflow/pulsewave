@@ -20,8 +20,8 @@ A modern WebRTC conferencing solution built on top of [mediasoup](https://medias
 | Package                       | Description                                | Status      | NPM                                                                                                                               |
 | ----------------------------- | ------------------------------------------ | ----------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | `@bytepulse/pulsewave-client` | React client SDK with hooks and components | ✅ Complete | [![npm](https://img.shields.io/npm/v/@bytepulse/pulsewave-client.svg)](https://www.npmjs.com/package/@bytepulse/pulsewave-client) |
-| `@bytepulse/pulsewave-server` | Mediasoup SFU server (Docker)              | ✅ Complete | [![npm](https://img.shields.io/npm/v/@bytepulse/pulsewave-server.svg)](https://www.npmjs.com/package/@bytepulse/pulsewave-server) |
-| `@bytepulse/pulsewave-shared` | Shared types and constants                 | ✅ Complete | -                                                                                                                                 |
+
+|
 
 ## Installation
 
@@ -33,11 +33,13 @@ npm install @bytepulse/pulsewave-client
 
 Visit [npmjs.com/package/@bytepulse/pulsewave-client](https://www.npmjs.com/package/@bytepulse/pulsewave-client) for detailed client SDK documentation.
 
-Visit [npmjs.com/package/@bytepulse/pulsewave-server](https://www.npmjs.com/package/@bytepulse/pulsewave-server) for detailed server documentation.
+Visit [@bytepulse/pulsewave-server](https://github.com/bytepulseflow/pulsewave/tree/main/packages/server) for detailed server documentation.
 
 ## Quick Start
 
 ### Server (Docker)
+
+> **⚠️ NOTE: Before running the server set `ANNOUNCED_IP={host_ip_address}` in .env file to your machine ipv4 address.**
 
 ```bash
 # Clone the repository
@@ -191,14 +193,6 @@ docker build -t pulsewave/server:latest packages/server
 # Run with docker-compose
 cd packages/server
 docker-compose up -d
-```
-
-### Client (NPM)
-
-```bash
-# Build and publish
-pnpm build
-pnpm release
 ```
 
 ## Contributing

@@ -75,13 +75,13 @@ export class WebRTCManager {
     this.sendFn = sendFn;
     this.onMessage = onMessage;
     this.offMessage = offMessage;
+
     this.config = {
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+      iceServers: config.iceServers ?? [{ urls: 'stun:stun.l.google.com:19302' }],
       iceTransportPolicy: 'all',
       ...config,
     };
   }
-
   /**
    * Initialize the device
    */

@@ -7,7 +7,7 @@ React client SDK for PulseWave. Provides simple hooks and components for buildin
 ## Installation
 
 ```bash
-npm install @bytepulse/pulsewave-client
+pnpm install @bytepulse/pulsewave-client
 ```
 
 ## Server Setup
@@ -16,13 +16,17 @@ The PulseWave client SDK requires a running PulseWave server. You can set up the
 
 ### Option 1: Using Docker (Recommended)
 
+> **⚠️ NOTE: Before running the server set `ANNOUNCED_IP={host_ip_address}` in .env file to your machine ipv4 address.**
+
 ```bash
 # Clone the repository
 git clone https://github.com/bytepulseflow/pulsewave.git
-cd pulsewave
+cd pulsewave/server
+
+# Copy environment file
+cp .env.example .env
 
 # Start the server with docker-compose
-cd packages/server
 docker-compose up -d
 ```
 
@@ -37,7 +41,7 @@ cd pulsewave
 
 # Install dependencies
 cd packages/server
-npm install
+pnpm install
 
 # Copy environment file
 cp .env.example .env
@@ -46,62 +50,10 @@ cp .env.example .env
 # Required: API_KEY and API_SECRET for token generation
 
 # Start the server
-npm start
+pnpm start:dev
 ```
 
-### Environment Variables
-
-The server requires the following environment variables:
-
-```bash
-# Server
-PORT=3000
-HOST=0.0.0.0
-
-# JWT (Required)
-API_KEY=your-api-key
-API_SECRET=your-api-secret
-
-# Mediasoup
-MEDIASOUP_NUM_WORKERS=4
-MEDIASOUP_MIN_PORT=40000
-MEDIASOUP_MAX_PORT=50000
-
-# Redis (Optional)
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_ENABLED=false
-
-# ICE Servers
-ICE_SERVERS=[{"urls":["stun:stun.l.google.com:19302"]}]
-```
-
-### Token Generation
-
-The client SDK requires an access token to join rooms. You can generate tokens using the server's API:
-
-```bash
-curl -X POST http://localhost:3000/api/token \
-  -H "Content-Type: application/json" \
-  -d '{
-    "identity": "user-123",
-    "name": "John Doe",
-    "room": "my-room",
-    "canPublish": true,
-    "canSubscribe": true,
-    "canPublishData": true
-  }'
-```
-
-Response:
-
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-
-For more server documentation, visit the [PulseWave Server GitHub Repository](https://github.com/bytepulseflow/pulsewave/tree/main/packages/server).
+For more details on server, visit the [PulseWave Server GitHub Repository](https://github.com/bytepulseflow/pulsewave/tree/main/packages/server).
 
 ## Quick Start
 
@@ -112,7 +64,7 @@ PulseWave Client SDK provides two approaches for building video/audio applicatio
 Build custom UI using hooks for full control:
 
 ```tsx
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   RoomProvider,
   useRoom,
@@ -127,6 +79,13 @@ function VideoRoom() {
   const localParticipant = useLocalParticipant();
   const participants = useParticipants();
   const connectionState = useConnectionState();
+
+  useEffect(() => {
+    connect();
+    return () => {
+      disconnect();
+    };
+  }, []);
 
   const toggleCamera = async () => {
     if (localParticipant) {
@@ -153,9 +112,6 @@ function VideoRoom() {
   return (
     <div className="video-room">
       <div className="controls">
-        <button onClick={connect} disabled={connectionState === 'connected'}>
-          Join Room
-        </button>
         <button onClick={disconnect} disabled={connectionState === 'disconnected'}>
           Leave Room
         </button>
@@ -212,6 +168,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Function to generate token from API
   const generateToken = async (identity: string, room: string, name: string) => {
     try {
       const response = await fetch('http://localhost:3000/api/token', {
@@ -318,6 +275,8 @@ export default function App() {
 ```
 
 ### Option 2: Built-in Component-Based Usage
+
+> **NOTE: Under active development**
 
 Use the pre-built components for quick setup with minimal code:
 
