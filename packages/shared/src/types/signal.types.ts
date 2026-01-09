@@ -323,6 +323,7 @@ export interface DataReceivedMessage {
   type: 'data';
   participantSid: string;
   payload: unknown;
+  kind?: 'reliable' | 'lossy';
 }
 
 /**
