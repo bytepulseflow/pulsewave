@@ -10,24 +10,41 @@ The server is designed to be deployed via Docker or run directly with Node.js.
 
 ## Quick Start
 
+> **⚠️ NOTE: Before running the server set `ANNOUNCED_IP={host_ip_address}` in .env file to your machine ipv4 address.**
+
 ### Docker (Recommended)
 
 ```bash
-cd packages/server
-docker-compose up -d
-```
+# Clone the repository
+git clone https://github.com/bytepulseflow/pulsewave.git
+cd pulsewave/server
 
-### Node.js
-
-```bash
 # Copy environment file
 cp .env.example .env
 
-# Install dependencies
-npm install
+# Start the server with docker-compose
+docker-compose up -d
+```
 
-# Start server
-npm start
+### Option 2: Manual Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/bytepulseflow/pulsewave.git
+cd pulsewave
+
+# Install dependencies
+cd packages/server
+pnpm install
+
+# Copy environment file
+cp .env.example .env
+
+# Edit .env with your configuration
+# Required: API_KEY and API_SECRET for token generation
+
+# Start the server
+pnpm start:dev
 ```
 
 ## Environment Variables
@@ -37,7 +54,9 @@ npm start
 PORT=3000
 HOST=0.0.0.0
 
+
 # Mediasoup
+ANNOUNCED_IP={host_ipv4_address}
 MEDIASOUP_NUM_WORKERS=4
 MEDIASOUP_MIN_PORT=40000
 MEDIASOUP_MAX_PORT=50000

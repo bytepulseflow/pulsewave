@@ -5,8 +5,8 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "noEmit": false,
-    "module": "ESNext",
-    "moduleResolution": "bundler",
+    "module": "CommonJS",
+    "moduleResolution": "node",
     "target": "ES2022",
     "declaration": true,
     "declarationMap": true
