@@ -3,35 +3,41 @@ import { useAudioAnalyzer } from '../hooks/useAudioAnalyzer';
 import './avatar.css';
 
 type Props = {
-  stream: MediaStream | null;
+  /** Audio track for pulse visualization (optional if rings are provided) */
+  audioTrack?: MediaStreamTrack | null;
+  /** Pre-calculated ring values (optional, will be calculated from audioTrack if not provided) */
+  rings?: {
+    ring1: number;
+    ring2: number;
+    ring3: number;
+  };
   avatarUrl?: string;
   fallbackName?: string;
 };
 
-export function AvatarPulse({ stream, avatarUrl, fallbackName }: Props) {
+export function AvatarPulse({ audioTrack, rings: ringsProp, avatarUrl, fallbackName }: Props) {
   const [rings, setRings] = useState({
     ring1: 0,
     ring2: 0,
     ring3: 0,
   });
 
-  // Get audio track from stream
-  const audioTrack = stream?.getAudioTracks()[0] ?? null;
-
-  // Use centralized audio analyzer for pulse visualization
+  // Use centralized audio analyzer if rings not provided
   const { rings: analyzerRings } = useAudioAnalyzer({
-    track: audioTrack,
+    track: audioTrack ?? null,
     speakingThreshold: 20,
   });
 
-  // Update rings from analyzer
+  // Update rings from analyzer or props
   useEffect(() => {
-    if (analyzerRings) {
+    if (ringsProp) {
+      setRings(ringsProp);
+    } else if (analyzerRings) {
       setRings(analyzerRings);
     }
-  }, [analyzerRings]);
+  }, [ringsProp, analyzerRings]);
 
-  if (!stream) {
+  if (!audioTrack && !ringsProp) {
     return (
       <div>
         {avatarUrl ? (

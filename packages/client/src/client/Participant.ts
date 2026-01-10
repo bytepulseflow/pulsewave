@@ -2,7 +2,7 @@
  * Participant classes
  */
 
-import type { ParticipantInfo, ConnectionState } from '@bytepulse/pulsewave-shared';
+import type { ParticipantInfo, ConnectionState, TrackInfo } from '@bytepulse/pulsewave-shared';
 import type {
   Participant,
   ParticipantEvents,
@@ -92,20 +92,7 @@ export class ParticipantImpl implements Participant {
     this.state = info.state;
     this.metadata = info.metadata || {};
 
-    // Update tracks
-    info.tracks.forEach((trackInfo) => {
-      let publication = this.tracks.get(trackInfo.sid);
-      if (!publication) {
-        publication = new RemoteTrackPublicationImpl(trackInfo, trackInfo.sid);
-        publication.setTrackSubscribedCallback(this.handleTrackSubscribed.bind(this));
-        this.tracks.set(trackInfo.sid, publication);
-        this.emit('track-published', publication);
-      } else {
-        publication.setMuted(trackInfo.muted);
-      }
-    });
-
-    // Remove tracks that no longer exist
+    // First, remove tracks that no longer exist in info.tracks
     const currentTrackSids = new Set(info.tracks.map((t) => t.sid));
     for (const [sid, publication] of this.tracks.entries()) {
       if (!currentTrackSids.has(sid)) {
@@ -114,6 +101,55 @@ export class ParticipantImpl implements Participant {
         this.emit('track-unpublished', publication);
       }
     }
+
+    // Then, update/add tracks from info.tracks
+    // Group tracks by source and kind to ensure only one track per source-kind combination
+    const tracksBySourceKind = new Map<string, TrackInfo>();
+    info.tracks.forEach((trackInfo) => {
+      const key = `${trackInfo.source}-${trackInfo.kind}`;
+      // Only keep the last track for each source-kind combination
+      tracksBySourceKind.set(key, trackInfo);
+    });
+
+    // Remove old tracks that have been replaced by new tracks of the same source-kind
+    for (const trackInfo of tracksBySourceKind.values()) {
+      // Find other publications with the same source-kind
+      for (const [sid, publication] of this.tracks.entries()) {
+        if (
+          sid !== trackInfo.sid &&
+          publication.source === trackInfo.source &&
+          publication.kind === trackInfo.kind
+        ) {
+          this.tracks.delete(sid);
+          publication.clearTrack();
+          this.emit('track-unpublished', publication);
+        }
+      }
+    }
+
+    // Now process the remaining tracks - only the latest track for each source-kind combination
+    const tracksToProcess = Array.from(tracksBySourceKind.values());
+    tracksToProcess.forEach((trackInfo) => {
+      let publication = this.tracks.get(trackInfo.sid);
+
+      if (!publication) {
+        // New publication
+        publication = new RemoteTrackPublicationImpl(trackInfo, trackInfo.sid);
+        publication.setTrackSubscribedCallback(this.handleTrackSubscribed.bind(this));
+        this.tracks.set(trackInfo.sid, publication);
+        this.emit('track-published', publication);
+      } else if (!publication.track) {
+        // Re-publication: publication exists but track was cleared
+        // Recreate the publication to ensure all track info is updated
+        publication = new RemoteTrackPublicationImpl(trackInfo, trackInfo.sid);
+        publication.setTrackSubscribedCallback(this.handleTrackSubscribed.bind(this));
+        this.tracks.set(trackInfo.sid, publication);
+        this.emit('track-published', publication);
+      } else {
+        // Existing publication with track, just update muted state
+        publication.setMuted(trackInfo.muted);
+      }
+    });
   }
 
   /**

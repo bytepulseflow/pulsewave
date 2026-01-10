@@ -1,5 +1,8 @@
 /**
  * PulseMediaTrack - Unified component for rendering audio and video tracks
+ *
+ * Properly handles track attachment with separate stream refs and efficient reuse.
+ * Does NOT stop tracks - they are managed by mediasoup producer/consumer.
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -35,7 +38,8 @@ export function PulseMediaTrack({
 }: PulseMediaTrackProps): JSX.Element | null {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const videoStreamRef = useRef<MediaStream | null>(null);
+  const audioStreamRef = useRef<MediaStream | null>(null);
   const [isVideoLoaded, setIsVideoLoaded] = useState(false);
   const [hasVideoError, setHasVideoError] = useState(false);
 
@@ -44,24 +48,47 @@ export function PulseMediaTrack({
 
   // Attach video track
   useEffect(() => {
-    if (kind !== 'video' || !track) {
-      // Cleanup if no track - just clear srcObject, don't stop tracks
+    if (kind !== 'video') {
+      // Not a video track - cleanup
       if (videoRef.current) {
         videoRef.current.srcObject = null;
         setIsVideoLoaded(false);
         setHasVideoError(false);
       }
-      streamRef.current = null;
+      videoStreamRef.current = null;
+      return;
+    }
+
+    if (!track) {
+      // Video track doesn't exist (camera disabled) - cleanup and show avatar
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+        setIsVideoLoaded(false);
+        setHasVideoError(false);
+      }
+      videoStreamRef.current = null;
       return;
     }
 
     const videoElement = videoRef.current;
-    if (!videoElement) return;
+    if (!videoElement) {
+      return;
+    }
 
-    // Create new stream and add track
-    const stream = new MediaStream();
-    stream.addTrack(track.mediaTrack);
-    streamRef.current = stream;
+    // Reuse existing stream if track hasn't changed
+    const currentTrackId = videoStreamRef.current?.getTracks()[0]?.id;
+    if (videoStreamRef.current && currentTrackId === track.mediaTrack.id) {
+      // Track hasn't changed, just update muted state
+      videoElement.muted = muted;
+      return;
+    }
+
+    // Clean up old stream reference (don't stop tracks - they're managed by mediasoup)
+    videoStreamRef.current = null;
+
+    // Create new stream with the track
+    const stream = new MediaStream([track.mediaTrack]);
+    videoStreamRef.current = stream;
 
     // Reset states
     setIsVideoLoaded(false);
@@ -89,7 +116,7 @@ export function PulseMediaTrack({
       videoElement.removeEventListener('loadedmetadata', onLoadedMetadata);
       videoElement.removeEventListener('error', onError);
       videoElement.srcObject = null;
-      streamRef.current = null;
+      videoStreamRef.current = null;
       setIsVideoLoaded(false);
       setHasVideoError(false);
     };
@@ -102,40 +129,50 @@ export function PulseMediaTrack({
       if (audioRef.current) {
         audioRef.current.srcObject = null;
       }
-      streamRef.current = null;
+      audioStreamRef.current = null;
       return;
     }
 
     const audioElement = audioRef.current;
     if (!audioElement) return;
 
-    // Create new stream and add track
-    const stream = new MediaStream();
-    stream.addTrack(track.mediaTrack);
-    streamRef.current = stream;
+    // Reuse existing stream if track hasn't changed
+    const currentTrackId = audioStreamRef.current?.getTracks()[0]?.id;
+    if (audioStreamRef.current && currentTrackId === track.mediaTrack.id) {
+      // Track hasn't changed, just update muted state
+      audioElement.muted = muted || !track.mediaTrack.enabled;
+      return;
+    }
+
+    // Clean up old stream reference (don't stop tracks - they're managed by mediasoup)
+    audioStreamRef.current = null;
+
+    // Create new stream with the track
+    const stream = new MediaStream([track.mediaTrack]);
+    audioStreamRef.current = stream;
 
     audioElement.srcObject = stream;
+    audioElement.muted = muted || !track.mediaTrack.enabled;
 
-    const updateMutedState = () => {
-      const shouldBeMuted = muted || !track.mediaTrack.enabled;
-      audioElement.muted = shouldBeMuted;
-
-      if (!shouldBeMuted) {
-        audioElement.play().catch((error) => {
-          console.error('Failed to play audio:', error);
-        });
+    // Poll for enabled state changes instead of relying on enabledchange event
+    const enabledCheckInterval = setInterval(() => {
+      if (audioElement && track) {
+        const shouldBeMuted = muted || !track.mediaTrack.enabled;
+        if (audioElement.muted !== shouldBeMuted) {
+          audioElement.muted = shouldBeMuted;
+          if (!shouldBeMuted) {
+            audioElement.play().catch((error) => {
+              console.error('Failed to play audio:', error);
+            });
+          }
+        }
       }
-    };
-
-    // Initial sync
-    updateMutedState();
-
-    track.mediaTrack.addEventListener('enabledchange', updateMutedState);
+    }, 100);
 
     return () => {
-      track.mediaTrack.removeEventListener('enabledchange', updateMutedState);
+      clearInterval(enabledCheckInterval);
       audioElement.srcObject = null;
-      streamRef.current = null;
+      audioStreamRef.current = null;
     };
   }, [track, kind, muted]);
 
@@ -151,10 +188,11 @@ export function PulseMediaTrack({
     }
   }, [kind, onAudioElement]);
 
-  if (!publication) {
+  // Show avatar if no publication or no track (camera disabled)
+  if (!publication || !track) {
     return (
       <div className="no-video-container">
-        <AvatarPulse stream={null} fallbackName={fallbackName} avatarUrl={avatarUrl} />
+        <AvatarPulse audioTrack={null} fallbackName={fallbackName} avatarUrl={avatarUrl} />
       </div>
     );
   }
