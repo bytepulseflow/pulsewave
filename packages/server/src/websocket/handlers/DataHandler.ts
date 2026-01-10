@@ -38,6 +38,7 @@ export class DataHandler extends BaseHandler {
           type: 'data',
           participantSid: participant.sid,
           payload,
+          kind, // Include kind so receiver knows the channel type
         },
         context.ws.socketId
       );

@@ -23,6 +23,9 @@ export { TrackUnmutedHandler } from './TrackUnmutedHandler';
 export { TransportCreatedHandler } from './TransportCreatedHandler';
 export { TransportConnectedHandler } from './TransportConnectedHandler';
 export { DataHandler } from './DataHandler';
+export { DataConsumerCreatedHandler } from './DataConsumerCreatedHandler';
+export { DataConsumerClosedHandler } from './DataConsumerClosedHandler';
+export { DataProducerCreatedHandler } from './DataProducerCreatedHandler';
 export { ErrorHandler } from './ErrorHandler';
 
 // Handler registry

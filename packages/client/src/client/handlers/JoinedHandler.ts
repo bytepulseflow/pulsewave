@@ -67,8 +67,15 @@ export class JoinedHandler extends BaseHandler {
       // Initialize WebRTC first
       client
         .ensureWebRTCInitialized()
-        .then(() => client.subscribeToAllTracks())
-        .then(() => logger.info('Auto-subscribed to all existing tracks'))
+        .then(async () => {
+          // Initialize WebRTC data provider if configured
+          // This will trigger transport connection via produceData()
+          await client.initializeWebRTCDataProvider();
+
+          // Subscribe to all tracks
+          await client.subscribeToAllTracks();
+          logger.info('Auto-subscribed to all existing tracks');
+        })
         .catch((error: Error) =>
           logger.error('Failed to auto-subscribe to existing tracks', { error })
         );
