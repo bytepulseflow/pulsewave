@@ -1,0 +1,68 @@
+.pulse-root {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  display: grid;
+  place-items: center;
+}
+
+.avatar {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+  z-index: 10;
+  background: #1e293b;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  color: white;
+}
+
+/* COMMON RING */
+.ring {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  will-change: transform, opacity;
+
+  opacity: var(--energy);
+  transition: transform 50ms linear, opacity 50ms linear;
+}
+
+/* INNER */
+.ring-1 {
+  width: 110px;
+  height: 110px;
+  background: rgba(59, 130, 246, 0.9);
+  transform: scale(calc(1 + var(--energy) * 0.25));
+}
+
+/* MID */
+.ring-2 {
+  width: 130px;
+  height: 130px;
+  background: rgba(59, 130, 246, 0.6);
+  transform: scale(calc(1 + var(--energy) * 0.35));
+  filter: blur(1px);
+}
+
+/* OUTER */
+.ring-3 {
+  width: 150px;
+  height: 150px;
+  background: rgba(59, 130, 246, 0.4);
+  transform: scale(calc(1 + var(--energy) * 0.45));
+  filter: blur(2px);
+}
+
+
+.no-video-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+}
