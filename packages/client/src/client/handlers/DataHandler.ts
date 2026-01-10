@@ -4,7 +4,7 @@
 
 import { BaseHandler } from './BaseHandler';
 import type { HandlerContext } from './types';
-import type { DataReceivedMessage } from '@bytepulse/pulsewave-shared';
+import type { DataReceivedMessage, DataPacket, DataPacketKind } from '@bytepulse/pulsewave-shared';
 
 export class DataHandler extends BaseHandler {
   public readonly type = 'data';
@@ -14,7 +14,15 @@ export class DataHandler extends BaseHandler {
 
     const participant = client.getParticipant(message.participantSid);
     if (participant) {
-      this.emit(context, 'data-received', { data: message.payload, participant });
+      // Create a DataPacket structure for consistency
+      const dataPacket: DataPacket = {
+        kind: (message.kind || 'reliable') as DataPacketKind,
+        value: message.payload,
+        participantSid: message.participantSid,
+        timestamp: Date.now(),
+      };
+
+      this.emit(context, 'data-received', { data: dataPacket, participant });
     }
   }
 }

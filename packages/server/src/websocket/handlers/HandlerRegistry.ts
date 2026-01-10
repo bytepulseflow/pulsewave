@@ -19,6 +19,8 @@ import { UnsubscribeHandler } from './UnsubscribeHandler';
 import { ResumeConsumerHandler } from './ResumeConsumerHandler';
 import { MuteHandler } from './MuteHandler';
 import { DataHandler } from './DataHandler';
+import { CreateDataProducerHandler } from './CreateDataProducerHandler';
+import { CloseDataProducerHandler } from './CloseDataProducerHandler';
 
 const logger = createModuleLogger('handler-registry');
 
@@ -44,6 +46,8 @@ export class HandlerRegistry {
     this.register(new ResumeConsumerHandler());
     this.register(new MuteHandler());
     this.register(new DataHandler());
+    this.register(new CreateDataProducerHandler());
+    this.register(new CloseDataProducerHandler());
   }
 
   /**

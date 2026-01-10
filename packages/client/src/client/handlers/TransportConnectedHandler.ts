@@ -2,6 +2,9 @@
  * Transport Connected Handler
  *
  * Handles transport_connected messages from the server.
+ *
+ * Note: Transport connection events are now handled directly in WebRTCManager's
+ * setupTransportListeners method. This handler is kept for logging purposes.
  */
 
 import { BaseHandler } from './BaseHandler';
@@ -15,11 +18,11 @@ export class TransportConnectedHandler extends BaseHandler {
   readonly type = 'transport_connected';
 
   handle(_context: HandlerContext, message: TransportConnectedMessage): void {
-    logger.debug('Transport connected', {
+    logger.info('Transport connected', {
       transportId: message.transportId,
     });
 
-    // The WebRTC controller will handle the transport connection
-    // This handler is mainly for logging purposes
+    // Transport connection events are now handled directly in WebRTCManager
+    // No action needed here as the event is already processed in setupTransportListeners
   }
 }

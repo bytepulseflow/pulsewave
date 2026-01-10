@@ -159,6 +159,7 @@ export class Room {
     enableUdp: boolean;
     enableTcp: boolean;
     preferUdp: boolean;
+    enableSctp?: boolean;
     listenIps: { ip: string; announcedIp?: string }[];
     initialAvailableOutgoingBitrate?: number;
     minimumAvailableOutgoingBitrate?: number;

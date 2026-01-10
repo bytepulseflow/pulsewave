@@ -22,6 +22,8 @@ export { UnsubscribeHandler } from './UnsubscribeHandler';
 export { ResumeConsumerHandler } from './ResumeConsumerHandler';
 export { MuteHandler } from './MuteHandler';
 export { DataHandler } from './DataHandler';
+export { CreateDataProducerHandler } from './CreateDataProducerHandler';
+export { CloseDataProducerHandler } from './CloseDataProducerHandler';
 
 // Handler registry
 export { HandlerRegistry, handlerRegistry } from './HandlerRegistry';

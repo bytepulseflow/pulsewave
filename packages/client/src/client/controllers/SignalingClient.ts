@@ -52,7 +52,7 @@ export class SignalingClient {
     this.sendFn({
       type: 'data',
       kind,
-      value: data,
+      payload: data,
     });
   }
 

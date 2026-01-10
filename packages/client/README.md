@@ -687,8 +687,90 @@ interface RoomClientOptions {
   iceServers?: RTCIceServer[];
   iceTransportPolicy?: 'all' | 'relay';
   debug?: boolean;
+  dataProvider?: DataProviderConfig | DataProviderType;
+}
+
+type DataProviderType = 'WebSocket' | 'WebRTC';
+
+interface DataProviderConfig {
+  type: DataProviderType;
+  maxMessageSize?: number;
+  ordered?: boolean;
+  maxPacketLifeTime?: number;
+  maxRetransmits?: number;
 }
 ```
+
+#### Data Provider Options
+
+PulseWave supports two data transmission methods for data channels:
+
+**WebSocket (Default)** - Data flows through WebSocket signaling layer, routed through the server to all participants.
+
+```tsx
+// Default - no configuration needed
+const client = new RoomClient({
+  url: 'ws://localhost:3000',
+  room: 'my-room',
+  token: 'your-token',
+  // dataProvider defaults to WebSocket
+});
+
+// Explicit WebSocket configuration
+const client = new RoomClient({
+  url: 'ws://localhost:3000',
+  room: 'my-room',
+  token: 'your-token',
+  dataProvider: 'WebSocket',
+});
+
+// With custom options
+const client = new RoomClient({
+  url: 'ws://localhost:3000',
+  room: 'my-room',
+  token: 'your-token',
+  dataProvider: {
+    type: 'WebSocket',
+    maxMessageSize: 16384, // 16KB default
+  },
+});
+```
+
+**WebRTC (Experimental)** - Uses mediasoup's DataProducer/DataConsumer for peer-to-peer data transmission through the SFU.
+
+```tsx
+// Default WebRTC configuration
+const client = new RoomClient({
+  url: 'ws://localhost:3000',
+  room: 'my-room',
+  token: 'your-token',
+  dataProvider: 'WebRTC',
+});
+
+// With custom options
+const client = new RoomClient({
+  url: 'ws://localhost:3000',
+  room: 'my-room',
+  token: 'your-token',
+  dataProvider: {
+    type: 'WebRTC',
+    maxMessageSize: 262144, // 256KB default
+    ordered: true,
+    maxPacketLifeTime: 1000,
+    maxRetransmits: 3,
+  },
+});
+```
+
+**Choosing Between Data Providers:**
+
+| Feature      | WebSocket                | WebRTC                      |
+| ------------ | ------------------------ | --------------------------- |
+| Latency      | Higher (server relay)    | Lower (P2P through SFU)     |
+| Scalability  | Better (server managed)  | Limited (P2P connections)   |
+| Reliability  | High (server guaranteed) | Medium (depends on network) |
+| Message Size | 16KB default             | 256KB default               |
+| Status       | Stable                   | Experimental                |
 
 ### TrackPublishOptions
 
