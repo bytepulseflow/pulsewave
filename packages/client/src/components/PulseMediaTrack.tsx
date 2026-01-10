@@ -32,7 +32,6 @@ export function PulseMediaTrack({
   onAudioElement,
   fallbackName,
   avatarUrl,
-  hasVideo,
 }: PulseMediaTrackProps): JSX.Element | null {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -91,12 +90,28 @@ export function PulseMediaTrack({
 
     audioElement.srcObject = stream;
 
+    const updateMutedState = () => {
+      const shouldBeMuted = muted || !track.mediaTrack.enabled;
+      audioElement.muted = shouldBeMuted;
+
+      if (!shouldBeMuted) {
+        audioElement.play().catch((error) => {
+          console.error('Failed to play audio:', error);
+        });
+      }
+    };
+
+    // Initial sync
+    updateMutedState();
+
+    track.mediaTrack.addEventListener('enabledchange', updateMutedState);
+
     return () => {
+      track.mediaTrack.removeEventListener('enabledchange', updateMutedState);
       audioElement.srcObject = null;
     };
-  }, [track, kind]);
+  }, [track, kind, muted]);
 
-  // Callbacks
   useEffect(() => {
     if (kind === 'video' && onVideoElement && videoRef.current) {
       onVideoElement(videoRef.current);
@@ -121,15 +136,6 @@ export function PulseMediaTrack({
     return (
       <div className={`pulsewave-media-track pulsewave-media-track--audio ${className}`}>
         <audio muted={muted} ref={audioRef} autoPlay playsInline style={{ display: 'none' }} />
-        {!hasVideo && (
-          <div className="no-video-container">
-            <AvatarPulse
-              stream={track ? new MediaStream([track.mediaTrack]) : null}
-              fallbackName={fallbackName}
-              avatarUrl={avatarUrl}
-            />
-          </div>
-        )}
       </div>
     );
   }

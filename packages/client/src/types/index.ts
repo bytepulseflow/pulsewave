@@ -659,6 +659,26 @@ export interface LocalParticipant extends Omit<
   disableMicrophone(): Promise<void>;
 
   /**
+   * Mute audio track (pauses producer, keeps track enabled)
+   */
+  muteAudio(): Promise<void>;
+
+  /**
+   * Unmute audio track (resumes producer)
+   */
+  unmuteAudio(): Promise<void>;
+
+  /**
+   * Mute video track (pauses producer, keeps track enabled)
+   */
+  muteVideo(): Promise<void>;
+
+  /**
+   * Unmute video track (resumes producer)
+   */
+  unmuteVideo(): Promise<void>;
+
+  /**
    * List available microphones
    */
   listAvailableMicrophones(): Promise<MediaDeviceInfo[]>;

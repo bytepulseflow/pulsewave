@@ -241,6 +241,10 @@ export class TrackController {
       mediaTrack
     );
 
+    // Set mute/unmute callbacks
+    localTrack.setMuteCallback(() => this.muteTrack(TrackKind.Video));
+    localTrack.setUnmuteCallback(() => this.unmuteTrack(TrackKind.Video));
+
     const publication = new LocalTrackPublicationImpl(
       {
         sid,
@@ -305,6 +309,10 @@ export class TrackController {
       mediaTrack
     );
 
+    // Set mute/unmute callbacks
+    localTrack.setMuteCallback(() => this.muteTrack(TrackKind.Audio));
+    localTrack.setUnmuteCallback(() => this.unmuteTrack(TrackKind.Audio));
+
     const publication = new LocalTrackPublicationImpl(
       {
         sid,
@@ -342,5 +350,33 @@ export class TrackController {
     }
 
     logger.info('Microphone disabled');
+  }
+
+  /**
+   * Mute local track (pause producer)
+   * @param kind - Track kind (audio or video)
+   */
+  async muteTrack(kind: TrackKind): Promise<void> {
+    const state = kind === 'audio' ? this.localAudioTrack : this.localVideoTrack;
+    const producer = state.producer;
+
+    if (producer) {
+      await producer.pause();
+      logger.info(`Track muted (${kind}), producer ID:`, producer.id);
+    }
+  }
+
+  /**
+   * Unmute local track (resume producer)
+   * @param kind - Track kind (audio or video)
+   */
+  async unmuteTrack(kind: TrackKind): Promise<void> {
+    const state = kind === 'audio' ? this.localAudioTrack : this.localVideoTrack;
+    const producer = state.producer;
+
+    if (producer) {
+      await producer.resume();
+      logger.info(`Track unmuted (${kind}), producer ID:`, producer.id);
+    }
   }
 }

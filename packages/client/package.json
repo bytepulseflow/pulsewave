@@ -13,12 +13,7 @@
     "./ui": {
       "types": "./dist/ui/index.d.ts",
       "import": "./dist/ui/index.js"
-    },
-    "./components": {
-      "types": "./dist/components/index.d.ts",
-      "import": "./dist/components/index.js"
-    },
-    "./components/styles.css": "./dist/components/styles.css"
+    }
   },
   "files": [
     "dist",

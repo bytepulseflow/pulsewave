@@ -189,6 +189,46 @@ export class LocalParticipantImpl implements LocalParticipant {
   }
 
   /**
+   * Mute audio track (pause producer without unpublishing)
+   */
+  async muteAudio(): Promise<void> {
+    const audioTrack = Array.from(this.tracks.values()).find((t) => t.kind === 'audio');
+    if (audioTrack?.track) {
+      await audioTrack.track.mute();
+    }
+  }
+
+  /**
+   * Unmute audio track (resume producer without republishing)
+   */
+  async unmuteAudio(): Promise<void> {
+    const audioTrack = Array.from(this.tracks.values()).find((t) => t.kind === 'audio');
+    if (audioTrack?.track) {
+      await audioTrack.track.unmute();
+    }
+  }
+
+  /**
+   * Mute video track (pause producer without unpublishing)
+   */
+  async muteVideo(): Promise<void> {
+    const videoTrack = Array.from(this.tracks.values()).find((t) => t.kind === 'video');
+    if (videoTrack?.track) {
+      await videoTrack.track.mute();
+    }
+  }
+
+  /**
+   * Unmute video track (resume producer without republishing)
+   */
+  async unmuteVideo(): Promise<void> {
+    const videoTrack = Array.from(this.tracks.values()).find((t) => t.kind === 'video');
+    if (videoTrack?.track) {
+      await videoTrack.track.unmute();
+    }
+  }
+
+  /**
    * List available microphones
    */
   async listAvailableMicrophones(): Promise<MediaDeviceInfo[]> {
