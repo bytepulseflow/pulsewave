@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useAudioPulse } from '../hooks/useAudioPulse';
+import { useState, useEffect } from 'react';
+import { useAudioAnalyzer } from '../hooks/useAudioAnalyzer';
 import './avatar.css';
 
 type Props = {
@@ -15,10 +15,21 @@ export function AvatarPulse({ stream, avatarUrl, fallbackName }: Props) {
     ring3: 0,
   });
 
-  useAudioPulse({
-    stream,
-    onUpdate: setRings,
+  // Get audio track from stream
+  const audioTrack = stream?.getAudioTracks()[0] ?? null;
+
+  // Use centralized audio analyzer for pulse visualization
+  const { rings: analyzerRings } = useAudioAnalyzer({
+    track: audioTrack,
+    speakingThreshold: 20,
   });
+
+  // Update rings from analyzer
+  useEffect(() => {
+    if (analyzerRings) {
+      setRings(analyzerRings);
+    }
+  }, [analyzerRings]);
 
   if (!stream) {
     return (

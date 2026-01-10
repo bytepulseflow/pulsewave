@@ -35,6 +35,7 @@ export function PulseMediaTrack({
 }: PulseMediaTrackProps): JSX.Element | null {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const [isVideoLoaded, setIsVideoLoaded] = useState(false);
   const [hasVideoError, setHasVideoError] = useState(false);
 
@@ -43,13 +44,28 @@ export function PulseMediaTrack({
 
   // Attach video track
   useEffect(() => {
-    if (kind !== 'video' || !track) return;
+    if (kind !== 'video' || !track) {
+      // Cleanup if no track - just clear srcObject, don't stop tracks
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+        setIsVideoLoaded(false);
+        setHasVideoError(false);
+      }
+      streamRef.current = null;
+      return;
+    }
 
     const videoElement = videoRef.current;
     if (!videoElement) return;
 
+    // Create new stream and add track
     const stream = new MediaStream();
     stream.addTrack(track.mediaTrack);
+    streamRef.current = stream;
+
+    // Reset states
+    setIsVideoLoaded(false);
+    setHasVideoError(false);
 
     videoElement.srcObject = stream;
     videoElement.muted = muted;
@@ -73,6 +89,7 @@ export function PulseMediaTrack({
       videoElement.removeEventListener('loadedmetadata', onLoadedMetadata);
       videoElement.removeEventListener('error', onError);
       videoElement.srcObject = null;
+      streamRef.current = null;
       setIsVideoLoaded(false);
       setHasVideoError(false);
     };
@@ -80,13 +97,22 @@ export function PulseMediaTrack({
 
   // Attach audio track
   useEffect(() => {
-    if (kind !== 'audio' || !track) return;
+    if (kind !== 'audio' || !track) {
+      // Cleanup if no track - just clear srcObject, don't stop tracks
+      if (audioRef.current) {
+        audioRef.current.srcObject = null;
+      }
+      streamRef.current = null;
+      return;
+    }
 
     const audioElement = audioRef.current;
     if (!audioElement) return;
 
+    // Create new stream and add track
     const stream = new MediaStream();
     stream.addTrack(track.mediaTrack);
+    streamRef.current = stream;
 
     audioElement.srcObject = stream;
 
@@ -109,6 +135,7 @@ export function PulseMediaTrack({
     return () => {
       track.mediaTrack.removeEventListener('enabledchange', updateMutedState);
       audioElement.srcObject = null;
+      streamRef.current = null;
     };
   }, [track, kind, muted]);
 

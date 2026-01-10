@@ -1,12 +1,15 @@
 /**
  * PulseParticipantView - Simplified component for rendering a participant with all their tracks
+ *
+ * Uses centralized audio analyzer for efficient resource usage.
  */
 
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import type { Participant, LocalParticipant } from '../types';
 import { TrackSource } from '@bytepulse/pulsewave-shared';
 import { PulseMediaTrack } from './PulseMediaTrack';
 import { AvatarPulse } from './AvatarPulse';
+import { useAudioAnalyzer } from '../hooks/useAudioAnalyzer';
 
 interface PulseParticipantViewProps {
   /** The participant to render (local or remote) */
@@ -25,6 +28,8 @@ interface PulseParticipantViewProps {
   onVideoElement?: (element: HTMLVideoElement | null) => void;
   /** Callback when audio element is created */
   onAudioElement?: (element: HTMLAudioElement | null) => void;
+  /** Speaking volume threshold (0-255) */
+  speakingThreshold?: number;
 }
 
 /**
@@ -45,82 +50,40 @@ export function PulseParticipantView({
   showYouBadge = true,
   onVideoElement,
   onAudioElement,
+  speakingThreshold = 20,
 }: PulseParticipantViewProps): JSX.Element {
-  const [isSpeaking, setIsSpeaking] = useState(false);
-
   const tracks = participant.getTracks();
 
   const isLocal = participant.isLocal;
 
-  const hasVideo = tracks.some((t) => t.kind === 'video' && t.source !== TrackSource.ScreenShare);
+  // Memoize track lookups to avoid repeated iterations
+  const trackInfo = useMemo(() => {
+    const hasVideo = tracks.some((t) => t.kind === 'video' && t.source !== TrackSource.ScreenShare);
+    const videoPublication = tracks.find(
+      (t) => t.kind === 'video' && t.source !== TrackSource.ScreenShare
+    );
+    const audioPublication = tracks.find((t) => t.kind === 'audio');
+    return { hasVideo, videoPublication, audioPublication };
+  }, [tracks]);
 
-  const videoPublication = tracks.find(
-    (t) => t.kind === 'video' && t.source !== TrackSource.ScreenShare
-  );
+  const { hasVideo, videoPublication, audioPublication } = trackInfo;
 
-  const audioPublication = tracks.find((t) => t.kind === 'audio');
-
-  useEffect(() => {
-    if (!audioPublication?.track) return;
-
-    const audioTrack = audioPublication.track.mediaTrack;
-    if (!(audioTrack instanceof MediaStreamTrack)) return;
-
-    let animationFrameId: number;
-    let audioContext: AudioContext | null = null;
-    let analyser: AnalyserNode | null = null;
-    let source: MediaStreamAudioSourceNode | null = null;
-
-    const setupAudioAnalysis = async () => {
-      try {
-        audioContext = new AudioContext();
-        analyser = audioContext.createAnalyser();
-        analyser.fftSize = 256;
-        analyser.smoothingTimeConstant = 0.8;
-
-        source = audioContext.createMediaStreamSource(new MediaStream([audioTrack]));
-        source.connect(analyser);
-
-        const dataArray = new Uint8Array(analyser.frequencyBinCount);
-
-        const analyzeAudio = () => {
-          if (!analyser) return;
-
-          analyser.getByteFrequencyData(dataArray);
-
-          const sum = dataArray.reduce((acc, val) => acc + val, 0);
-          const averageVolume = sum / dataArray.length;
-
-          // Speaking threshold
-          const speakingThreshold = 20;
-          setIsSpeaking(averageVolume > speakingThreshold);
-
-          animationFrameId = requestAnimationFrame(analyzeAudio);
-        };
-
-        analyzeAudio();
-      } catch (error) {
-        console.error('Failed to setup audio analysis:', error);
-      }
-    };
-
-    setupAudioAnalysis();
-
-    return () => {
-      if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-      }
-      if (source) {
-        source.disconnect();
-      }
-      if (audioContext) {
-        audioContext.close();
-      }
-    };
-  }, [audioPublication]);
+  // Use centralized audio analyzer for speaking detection
+  const { isSpeaking } = useAudioAnalyzer({
+    track: audioPublication?.track?.mediaTrack ?? null,
+    speakingThreshold,
+  });
 
   const identity = participant.identity;
   const name = participant.name || identity;
+
+  // Memoize avatar stream to avoid recreation on every render
+  const avatarStream = useMemo(() => {
+    if (audioPublication?.track) {
+      return new MediaStream([audioPublication.track.mediaTrack]);
+    }
+    return null;
+  }, [audioPublication]);
 
   return (
     <div
@@ -138,11 +101,7 @@ export function PulseParticipantView({
         ) : (
           <div className="pulsewave-participant__placeholder">
             <AvatarPulse
-              stream={
-                audioPublication?.track
-                  ? new MediaStream([audioPublication.track.mediaTrack])
-                  : null
-              }
+              stream={avatarStream}
               fallbackName={name}
               avatarUrl={participant.metadata?.avatarUrl as string | undefined}
             />
