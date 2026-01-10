@@ -1,5 +1,13 @@
 # @bytepulse/pulsewave-client
 
+## 0.3.6
+
+### Patch Changes
+
+- adding webrtc datachannel and websocket channel for text data exchanges betwwen peers
+- Updated dependencies
+  - @bytepulse/pulsewave-shared@0.2.3
+
 ## 0.3.3
 
 ### Patch Changes
