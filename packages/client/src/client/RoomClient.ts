@@ -5,8 +5,12 @@
  * Acts as a facade/coordinator, delegating to specialized controllers.
  */
 
-import type { RoomInfo, RtpCapabilities } from '@bytepulse/pulsewave-shared';
-import { ConnectionState } from '@bytepulse/pulsewave-shared';
+import type { RoomInfo, RtpCapabilities, DataProvider } from '@bytepulse/pulsewave-shared';
+import {
+  ConnectionState,
+  DataProviderType as SharedDataProviderType,
+  DataChannelKind,
+} from '@bytepulse/pulsewave-shared';
 import type {
   RoomClientOptions,
   RoomEvents,
@@ -28,6 +32,7 @@ import {
   WebRTCController,
   TrackController,
 } from './controllers';
+import { WebSocketDataProvider, WebRTCDataProvider } from '../data/providers';
 import { createModuleLogger } from '../utils/logger';
 
 const logger = createModuleLogger('room-client');
@@ -43,6 +48,9 @@ export class RoomClient {
   private mediaController: MediaController;
   private webRTCController: WebRTCController;
   private trackController: TrackController;
+
+  // Data provider (strategy pattern for data transmission)
+  private dataProvider: DataProvider | null = null;
 
   // Room state
   public roomInfo: RoomInfo | null = null;
@@ -68,8 +76,98 @@ export class RoomClient {
       (event, data) => this.eventBus.emit(event as keyof RoomEvents, data)
     );
 
+    // Initialize data provider based on configuration
+    this.initializeDataProvider();
+
     // Setup controller wiring
     this.setupControllers();
+  }
+
+  /**
+   * Initialize data provider based on configuration
+   */
+  private initializeDataProvider(): void {
+    const dataProviderConfig = this.options.dataProvider;
+
+    if (!dataProviderConfig) {
+      // Default to WebSocket provider
+      this.dataProvider = new WebSocketDataProvider(async (data, kind) =>
+        this.signalingClient.sendData(data, kind)
+      );
+      logger.info('Using WebSocket data provider (default)');
+      return;
+    }
+
+    // Check if it's a DataProviderType enum value
+    if (typeof dataProviderConfig === 'string') {
+      if (dataProviderConfig === SharedDataProviderType.WebSocket) {
+        this.dataProvider = new WebSocketDataProvider(async (data, kind) =>
+          this.signalingClient.sendData(data, kind)
+        );
+        logger.info('Using WebSocket data provider');
+      } else if (dataProviderConfig === SharedDataProviderType.WebRTC) {
+        // WebRTC provider requires WebRTC controller integration
+        this.dataProvider = new WebRTCDataProvider({
+          createDataProducer: async (config) => {
+            // Integrate with WebRTC controller to create data producer
+            await this.ensureWebRTCInitialized();
+            return this.webRTCController.createDataProducer(
+              config.label.includes('lossy') ? DataChannelKind.Lossy : DataChannelKind.Reliable,
+              config
+            );
+          },
+          closeDataProducer: async (producerId) => {
+            // Integrate with WebRTC controller to close data producer
+            return this.webRTCController.closeDataProducer(producerId);
+          },
+          onDataConsumer: (consumer) => {
+            // Handle new data consumer
+            logger.debug('Data consumer created via WebRTC', consumer);
+          },
+          onDataConsumerClosed: (consumerId) => {
+            // Handle data consumer closed
+            logger.debug('Data consumer closed via WebRTC', consumerId);
+          },
+        });
+        logger.info('Using WebRTC data provider (experimental)');
+      }
+    } else {
+      // Full configuration object
+      if (dataProviderConfig.type === SharedDataProviderType.WebSocket) {
+        this.dataProvider = new WebSocketDataProvider(
+          async (data, kind) => this.signalingClient.sendData(data, kind),
+          dataProviderConfig
+        );
+        logger.info('Using WebSocket data provider with custom config');
+      } else if (dataProviderConfig.type === SharedDataProviderType.WebRTC) {
+        this.dataProvider = new WebRTCDataProvider(
+          {
+            createDataProducer: async (config) => {
+              // Integrate with WebRTC controller to create data producer
+              await this.ensureWebRTCInitialized();
+              return this.webRTCController.createDataProducer(
+                config.label.includes('lossy') ? DataChannelKind.Lossy : DataChannelKind.Reliable,
+                config
+              );
+            },
+            closeDataProducer: async (producerId) => {
+              // Integrate with WebRTC controller to close data producer
+              return this.webRTCController.closeDataProducer(producerId);
+            },
+            onDataConsumer: (consumer) => {
+              // Handle new data consumer
+              logger.debug('Data consumer created via WebRTC', consumer);
+            },
+            onDataConsumerClosed: (consumerId) => {
+              // Handle data consumer closed
+              logger.debug('Data consumer closed via WebRTC', consumerId);
+            },
+          },
+          dataProviderConfig
+        );
+        logger.info('Using WebRTC data provider with custom config (experimental)');
+      }
+    }
   }
 
   /**
@@ -105,6 +203,23 @@ export class RoomClient {
     try {
       await this.connectionController.connect();
       this.signalingClient.sendJoin();
+
+      // Initialize data provider (only WebSocket provider can be initialized now)
+      // WebRTC provider will be initialized after WebRTC is ready
+      if (this.dataProvider && this.dataProvider.type === SharedDataProviderType.WebSocket) {
+        await this.dataProvider.initialize();
+        // Wire data provider events to event bus
+        this.dataProvider.on('data-received', (packet, participantSid) => {
+          const participant = this.participantStore.getParticipant(participantSid);
+          if (participant) {
+            this.eventBus.emit('data-received', { data: packet, participant });
+          }
+        });
+        this.dataProvider.on('error', (error) => {
+          this.eventBus.emit('error', error);
+        });
+      }
+
       this.eventBus.emit('connection-state-changed', ConnectionState.Connected);
     } catch (error) {
       this.eventBus.emit('error', error as Error);
@@ -113,9 +228,35 @@ export class RoomClient {
   }
 
   /**
+   * Initialize WebRTC data provider (called after WebRTC is ready)
+   */
+  public async initializeWebRTCDataProvider(): Promise<void> {
+    if (this.dataProvider && this.dataProvider.type === SharedDataProviderType.WebRTC) {
+      await this.dataProvider.initialize();
+      // Wire data provider events to event bus
+      this.dataProvider.on('data-received', (packet, participantSid) => {
+        const participant = this.participantStore.getParticipant(participantSid);
+        if (participant) {
+          this.eventBus.emit('data-received', { data: packet, participant });
+        }
+      });
+      this.dataProvider.on('error', (error) => {
+        this.eventBus.emit('error', error);
+      });
+      logger.info('WebRTC data provider initialized');
+    }
+  }
+
+  /**
    * Disconnect from the room
    */
   async disconnect(): Promise<void> {
+    // Close data provider
+    if (this.dataProvider) {
+      await this.dataProvider.close();
+      this.dataProvider = null;
+    }
+
     // Stop all tracks
     this.trackController.stopAllLocalTracks();
 
@@ -334,12 +475,11 @@ export class RoomClient {
    * Send data to all participants
    */
   async sendData(data: unknown, kind: 'reliable' | 'lossy' = 'reliable'): Promise<void> {
-    const localParticipant = this.participantStore.getLocalParticipant();
-    if (localParticipant) {
-      await localParticipant.publishData(data, kind);
+    if (!this.dataProvider) {
+      throw new Error('Data provider not initialized');
     }
 
-    this.signalingClient.sendData(data, kind);
+    await this.dataProvider.send(data, kind as DataChannelKind);
   }
 
   /**
@@ -417,5 +557,12 @@ export class RoomClient {
    */
   public send(message: Record<string, unknown>): void {
     this.connectionController.send(message);
+  }
+
+  /**
+   * Get the WebRTC controller (public for handlers)
+   */
+  public getWebRTCController(): WebRTCController | null {
+    return this.webRTCController;
   }
 }

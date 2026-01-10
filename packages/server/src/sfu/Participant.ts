@@ -10,8 +10,9 @@ import {
   TrackInfo,
   TrackKind,
   TrackSource,
+  DataChannelKind,
 } from '@bytepulse/pulsewave-shared';
-import type { Producer, Consumer, Transport } from 'mediasoup/types';
+import type { Producer, Consumer, Transport, DataProducer, DataConsumer } from 'mediasoup/types';
 import type { Room } from './Room';
 import { createModuleLogger } from '../utils/logger';
 
@@ -33,6 +34,9 @@ export class Participant {
   private producers: Map<string, Producer>;
   private consumers: Map<string, Consumer>;
   private transports: Map<string, Transport>;
+  private transportDirections: Map<string, string>;
+  private dataProducers: Map<string, DataProducer>;
+  private dataConsumers: Map<string, DataConsumer>;
 
   constructor(
     _room: Room,
@@ -57,6 +61,9 @@ export class Participant {
     this.producers = new Map();
     this.consumers = new Map();
     this.transports = new Map();
+    this.transportDirections = new Map();
+    this.dataProducers = new Map();
+    this.dataConsumers = new Map();
   }
 
   /**
@@ -91,8 +98,11 @@ export class Participant {
   /**
    * Add a transport
    */
-  public addTransport(id: string, transport: Transport): void {
+  public addTransport(id: string, transport: Transport, direction?: string): void {
     this.transports.set(id, transport);
+    if (direction) {
+      this.transportDirections.set(id, direction);
+    }
   }
 
   /**
@@ -100,6 +110,25 @@ export class Participant {
    */
   public getTransport(id: string): Transport | undefined {
     return this.transports.get(id);
+  }
+
+  /**
+   * Get transport direction by ID
+   */
+  public getTransportDirection(id: string): string | undefined {
+    return this.transportDirections.get(id);
+  }
+
+  /**
+   * Get a receive transport
+   */
+  public getReceiveTransport(): Transport | undefined {
+    for (const [id, direction] of this.transportDirections.entries()) {
+      if (direction === 'recv') {
+        return this.transports.get(id);
+      }
+    }
+    return undefined;
   }
 
   /**
@@ -111,6 +140,7 @@ export class Participant {
       transport.close();
       this.transports.delete(id);
     }
+    this.transportDirections.delete(id);
   }
 
   /**
@@ -225,7 +255,86 @@ export class Participant {
     this.consumers.clear();
 
     this.tracks.clear();
+
+    // Close all data producers
+    for (const dataProducer of this.dataProducers.values()) {
+      dataProducer.close();
+    }
+    this.dataProducers.clear();
+
+    // Close all data consumers
+    for (const dataConsumer of this.dataConsumers.values()) {
+      dataConsumer.close();
+    }
+    this.dataConsumers.clear();
+
     this.state = ConnectionState.Disconnected;
+  }
+
+  /**
+   * Add a data producer
+   */
+  public addDataProducer(id: string, dataProducer: DataProducer, kind: DataChannelKind): void {
+    this.dataProducers.set(id, dataProducer);
+    logger.debug(`Participant ${this.identity} added data producer ${id}, kind: ${kind}`);
+  }
+
+  /**
+   * Get a data producer by ID
+   */
+  public getDataProducer(id: string): DataProducer | undefined {
+    return this.dataProducers.get(id);
+  }
+
+  /**
+   * Remove a data producer
+   */
+  public removeDataProducer(id: string): void {
+    const dataProducer = this.dataProducers.get(id);
+    if (dataProducer) {
+      dataProducer.close();
+      this.dataProducers.delete(id);
+    }
+  }
+
+  /**
+   * Add a data consumer
+   */
+  public addDataConsumer(id: string, dataConsumer: DataConsumer): void {
+    this.dataConsumers.set(id, dataConsumer);
+    logger.debug(`Participant ${this.identity} added data consumer ${id}`);
+  }
+
+  /**
+   * Get a data consumer by ID
+   */
+  public getDataConsumer(id: string): DataConsumer | undefined {
+    return this.dataConsumers.get(id);
+  }
+
+  /**
+   * Remove a data consumer
+   */
+  public removeDataConsumer(id: string): void {
+    const dataConsumer = this.dataConsumers.get(id);
+    if (dataConsumer) {
+      dataConsumer.close();
+      this.dataConsumers.delete(id);
+    }
+  }
+
+  /**
+   * Get all data producers
+   */
+  public getDataProducers(): Map<string, DataProducer> {
+    return this.dataProducers;
+  }
+
+  /**
+   * Get all data consumers
+   */
+  public getDataConsumers(): Map<string, DataConsumer> {
+    return this.dataConsumers;
   }
 }
 

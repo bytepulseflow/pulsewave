@@ -62,7 +62,6 @@ class MediasoupServer {
       next();
     });
 
-    // Share config with routes
     this.app.set('jwtConfig', this.config.jwt);
   }
 
@@ -72,10 +71,9 @@ class MediasoupServer {
   private setupRoutes(): void {
     this.app.use('/api', routes);
 
-    // Root endpoint
     this.app.get('/', (_req: Request<unknown, ServerInfo>, res: Response<ServerInfo>) => {
       res.json({
-        name: 'Mediasoup Server',
+        name: 'Pulsewave Server',
         version: '0.1.0',
         status: 'running',
       });
@@ -88,15 +86,13 @@ class MediasoupServer {
   public async initialize(): Promise<void> {
     logger.info('Initializing Mediasoup Server...');
 
-    // Initialize Redis if enabled
     if (this.config.redis.enabled) {
       logger.info('Connecting to Redis...');
       this.redisManager = new RedisManager(this.config.redis);
-      await new Promise((resolve) => setTimeout(resolve, 100)); // Wait for connection
+      await new Promise((resolve) => setTimeout(resolve, 100));
       logger.info('Redis connected');
     }
 
-    // Create mediasoup workers
     logger.info(`Creating ${this.config.mediasoup.numWorkers} mediasoup workers...`);
     for (let i = 0; i < this.config.mediasoup.numWorkers; i++) {
       const worker = await createWorker(this.config.mediasoup);
@@ -104,10 +100,8 @@ class MediasoupServer {
       logger.info(`Worker ${i + 1} created`);
     }
 
-    // Create room manager
     this.roomManager = new RoomManager(this.workers);
 
-    // Create WebSocket server
     this.wsServer = new WebSocketServer(
       this.httpServer,
       this.roomManager,
@@ -137,24 +131,19 @@ class MediasoupServer {
   public async stop(): Promise<void> {
     logger.info('Shutting down server...');
 
-    // Close WebSocket server
     this.wsServer.close();
 
-    // Close all rooms
     await this.roomManager.closeAllRooms();
 
-    // Close all workers
     for (const worker of this.workers) {
       await worker.close();
     }
     this.workers = [];
 
-    // Close Redis
     if (this.redisManager) {
       await this.redisManager.close();
     }
 
-    // Close HTTP server
     return new Promise((resolve) => {
       this.httpServer.close(() => {
         logger.info('Server stopped');
@@ -170,7 +159,6 @@ class MediasoupServer {
 async function main(): Promise<void> {
   const server = new MediasoupServer();
 
-  // Handle graceful shutdown
   process.on('SIGINT', async () => {
     logger.info('Received SIGINT, shutting down...');
     await server.stop();
@@ -183,7 +171,6 @@ async function main(): Promise<void> {
     process.exit(0);
   });
 
-  // Start the server
   await server.start();
 }
 

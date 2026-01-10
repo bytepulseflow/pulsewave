@@ -9,8 +9,17 @@ import type {
   IceCandidate,
   DtlsParameters,
   RtpParameters,
+  DataChannelKind,
+  SctpParameters,
 } from '@bytepulse/pulsewave-shared';
 import { createModuleLogger } from '../utils/logger';
+
+/**
+ * Router capabilities (includes RTP and SCTP)
+ */
+interface RouterCapabilities {
+  rtpCapabilities: RtpCapabilities;
+}
 
 const logger = createModuleLogger('webrtc');
 
@@ -18,6 +27,8 @@ const logger = createModuleLogger('webrtc');
 type MediasoupTransport = types.Transport;
 type MediasoupProducer = types.Producer;
 type MediasoupConsumer = types.Consumer;
+type MediasoupDataProducer = types.DataProducer;
+type MediasoupDataConsumer = types.DataConsumer;
 
 /**
  * WebRTC configuration
@@ -35,6 +46,7 @@ interface TransportInfo {
   iceParameters: IceParameters;
   iceCandidates: IceCandidate[];
   dtlsParameters: DtlsParameters;
+  sctpParameters?: SctpParameters;
   direction: 'send' | 'recv';
 }
 
@@ -61,10 +73,21 @@ export class WebRTCManager {
   private recvTransport: MediasoupTransport | null = null;
   private producers: Map<string, MediasoupProducer> = new Map();
   private consumers: Map<string, MediasoupConsumer> = new Map();
+  private dataProducers: Map<string, MediasoupDataProducer> = new Map();
+  private dataConsumers: Map<string, MediasoupDataConsumer> = new Map();
   private sendFn: (message: Record<string, unknown>) => void;
   private onMessage: (handler: (data: unknown) => void) => void;
   private offMessage: (handler: (data: unknown) => void) => void;
   private config: WebRTCConfig;
+
+  // Track transport connection state
+  private sendTransportConnected = false;
+  private recvTransportConnected = false;
+  private sendTransportConnectPromise: Promise<void> | null = null;
+  private recvTransportConnectPromise: Promise<void> | null = null;
+  private sendTransportConnectResolve: (() => void) | null = null;
+  private recvTransportConnectResolve: (() => void) | null = null;
+  private onTransportsConnectedCallbacks: Set<() => void> = new Set();
 
   constructor(
     sendFn: (message: Record<string, unknown>) => void,
@@ -85,25 +108,30 @@ export class WebRTCManager {
   /**
    * Initialize the device
    */
-  async initialize(rtpCapabilities: RtpCapabilities): Promise<void> {
+  async initialize(routerCapabilities: RouterCapabilities): Promise<void> {
     this.device = new Device();
 
     try {
       // Convert shared types to mediasoup-client types
       // Type assertion needed because mediasoup-client has stricter type requirements
       const mediasoupRtpCapabilities = {
-        codecs: (rtpCapabilities.codecs || []).map((codec) => ({
+        codecs: (routerCapabilities.rtpCapabilities.codecs || []).map((codec) => ({
           ...codec,
           kind: codec.kind as 'audio' | 'video',
           preferredPayloadType: codec.preferredPayloadType || 0,
         })),
-        headerExtensions: (rtpCapabilities.headerExtensions || []).map((ext) => ({
-          ...ext,
-          kind: 'audio' as const,
-        })),
+        headerExtensions: (routerCapabilities.rtpCapabilities.headerExtensions || []).map(
+          (ext) => ({
+            ...ext,
+            kind: 'audio' as const,
+          })
+        ),
       } as types.RtpCapabilities;
 
-      await this.device.load({ routerRtpCapabilities: mediasoupRtpCapabilities });
+      // Load device with RTP and SCTP capabilities
+      await this.device.load({
+        routerRtpCapabilities: mediasoupRtpCapabilities,
+      });
       logger.info('Device loaded with RTP capabilities');
     } catch (error) {
       logger.error('Failed to load device', { error });
@@ -133,6 +161,8 @@ export class WebRTCManager {
       iceCandidates,
       // Type assertion needed because mediasoup-client has stricter DtlsParameters type
       dtlsParameters: transportInfo.dtlsParameters as types.DtlsParameters,
+      // Pass sctpParameters if available (for data channel support)
+      sctpParameters: transportInfo.sctpParameters as types.SctpParameters | undefined,
       iceServers: this.config.iceServers,
       iceTransportPolicy: this.config.iceTransportPolicy,
     });
@@ -163,6 +193,8 @@ export class WebRTCManager {
       iceCandidates,
       // Type assertion needed because mediasoup-client has stricter DtlsParameters type
       dtlsParameters: transportInfo.dtlsParameters as types.DtlsParameters,
+      // Pass sctpParameters if available (for data channel support)
+      sctpParameters: transportInfo.sctpParameters as types.SctpParameters | undefined,
       iceServers: this.config.iceServers,
       iceTransportPolicy: this.config.iceTransportPolicy,
     });
@@ -211,18 +243,50 @@ export class WebRTCManager {
       (
         { dtlsParameters }: { dtlsParameters: DtlsParameters },
         callback: () => void,
-        _errback: (error: Error) => void
+        errback: (error: Error) => void
       ) => {
+        // Send connect message to server
         this.sendFn({
           type: 'connect_transport',
           transportId: transport.id,
           dtlsParameters,
         });
 
-        // Wait for connect confirmation (simplified - just callback)
-        setTimeout(() => {
-          callback();
-        }, 100);
+        // Set up one-time listener for connect confirmation
+        const connectHandler = (data: unknown) => {
+          const msg = data as Record<string, unknown>;
+          if (msg.type === 'transport_connected' && msg.transportId === transport.id) {
+            this.offMessage(connectHandler);
+
+            // Mark transport as connected
+            if (direction === 'send') {
+              this.sendTransportConnected = true;
+              this.sendTransportConnectResolve?.();
+            } else {
+              this.recvTransportConnected = true;
+              this.recvTransportConnectResolve?.();
+            }
+
+            // Check if both transports are connected
+            this.checkTransportsConnected();
+
+            // Call the callback to signal successful connection
+            callback();
+          }
+        };
+
+        this.onMessage(connectHandler);
+
+        // Set up error handler
+        const errorHandler = (data: unknown) => {
+          const msg = data as Record<string, unknown>;
+          if (msg.type === 'error' && msg.transportId === transport.id) {
+            this.offMessage(errorHandler);
+            errback(new Error((msg.error as string) || 'Transport connection failed'));
+          }
+        };
+
+        this.onMessage(errorHandler);
       }
     );
 
@@ -240,6 +304,39 @@ export class WebRTCManager {
         ) => {
           try {
             const response = await this.requestProduce(transport.id, kind, rtpParameters, appData);
+            callback({ id: response.id });
+          } catch (error) {
+            errback(error as Error);
+          }
+        }
+      );
+
+      // Handle producedata event - this is triggered when calling transport.produceData()
+      transport.on(
+        'producedata',
+        async (
+          {
+            sctpStreamParameters,
+            label,
+            protocol,
+            appData,
+          }: {
+            sctpStreamParameters: types.SctpStreamParameters;
+            label?: string;
+            protocol?: string;
+            appData: Record<string, unknown>;
+          },
+          callback: (data: { id: string }) => void,
+          errback: (error: Error) => void
+        ) => {
+          try {
+            const response = await this.requestProduceData(
+              transport.id,
+              sctpStreamParameters,
+              label,
+              protocol,
+              appData
+            );
             callback({ id: response.id });
           } catch (error) {
             errback(error as Error);
@@ -282,6 +379,45 @@ export class WebRTCManager {
       setTimeout(() => {
         this.offMessage(handler);
         reject(new Error('Produce timeout'));
+      }, 10000);
+    });
+  }
+
+  /**
+   * Request to produce a data channel
+   */
+  private async requestProduceData(
+    transportId: string,
+    sctpStreamParameters: types.SctpStreamParameters,
+    label?: string,
+    protocol?: string,
+    appData?: Record<string, unknown>
+  ): Promise<{ id: string }> {
+    return new Promise((resolve, reject) => {
+      const message = {
+        type: 'create_data_producer',
+        transportId,
+        sctpStreamParameters,
+        label,
+        protocol,
+        appData,
+      };
+
+      const handler = (data: unknown) => {
+        const msg = data as Record<string, unknown>;
+        if (msg.type === 'data_producer_created' && msg.id) {
+          this.offMessage(handler);
+          resolve(msg as never);
+        }
+      };
+
+      this.onMessage(handler);
+      this.sendFn(message);
+
+      // Timeout after 10 seconds
+      setTimeout(() => {
+        this.offMessage(handler);
+        reject(new Error('ProduceData timeout'));
       }, 10000);
     });
   }
@@ -486,9 +622,190 @@ export class WebRTCManager {
   }
 
   /**
+   * Create a data producer
+   */
+  async createDataProducer(
+    kind: DataChannelKind,
+    options: {
+      label: string;
+      ordered?: boolean;
+      maxPacketLifeTime?: number;
+      maxRetransmits?: number;
+    }
+  ): Promise<{ id: string; dataProducer: MediasoupDataProducer }> {
+    if (!this.sendTransport) {
+      throw new Error('Send transport not created');
+    }
+
+    const dataProducer = await this.sendTransport.produceData({
+      label: options.label,
+      ordered: options.ordered !== false,
+      maxPacketLifeTime: options.maxPacketLifeTime,
+      maxRetransmits: options.maxRetransmits,
+    });
+
+    this.dataProducers.set(dataProducer.id, dataProducer);
+
+    logger.info(`Data producer created: ${dataProducer.id}, kind: ${kind}`);
+
+    // Return the DataProducer object itself - it wraps the underlying DataChannel
+    return {
+      id: dataProducer.id,
+      dataProducer,
+    };
+  }
+
+  /**
+   * Close a data producer
+   */
+  async closeDataProducer(producerId: string): Promise<void> {
+    const dataProducer = this.dataProducers.get(producerId);
+    if (dataProducer) {
+      dataProducer.close();
+      this.dataProducers.delete(producerId);
+
+      this.sendFn({
+        type: 'close_data_producer',
+        dataProducerId: producerId,
+      });
+
+      logger.info(`Data producer closed: ${producerId}`);
+    }
+  }
+
+  /**
+   * Add a data consumer (called when server notifies of new data consumer)
+   */
+  async addDataConsumer(
+    dataProducerId: string,
+    options: {
+      id: string;
+      sctpStreamParameters: types.SctpStreamParameters;
+      participantSid: string;
+      label: string;
+      ordered?: boolean;
+    }
+  ): Promise<{ id: string; dataConsumer: MediasoupDataConsumer }> {
+    if (!this.recvTransport) {
+      throw new Error('Receive transport not created');
+    }
+
+    const dataConsumer = await this.recvTransport.consumeData({
+      id: options.id,
+      dataProducerId,
+      sctpStreamParameters: options.sctpStreamParameters,
+    });
+
+    this.dataConsumers.set(dataConsumer.id, dataConsumer);
+
+    logger.info(
+      `Data consumer added: ${dataConsumer.id}, producer: ${dataProducerId}, participant: ${options.participantSid}`
+    );
+
+    return {
+      id: dataConsumer.id,
+      dataConsumer,
+    };
+  }
+
+  /**
+   * Close a data consumer
+   */
+  async closeDataConsumer(consumerId: string): Promise<void> {
+    const dataConsumer = this.dataConsumers.get(consumerId);
+    if (dataConsumer) {
+      dataConsumer.close();
+      this.dataConsumers.delete(consumerId);
+
+      logger.info(`Data consumer closed: ${consumerId}`);
+    }
+  }
+
+  /**
+   * Check if both transports are connected and trigger callbacks
+   */
+  private checkTransportsConnected(): void {
+    if (this.sendTransportConnected && this.recvTransportConnected) {
+      logger.info('Both transports connected, triggering callbacks');
+      this.onTransportsConnectedCallbacks.forEach((callback) => {
+        try {
+          callback();
+        } catch (error) {
+          logger.error('Error in transports connected callback', { error });
+        }
+      });
+    }
+  }
+
+  /**
+   * Register a callback to be called when both transports are connected
+   */
+  onTransportsConnected(callback: () => void): void {
+    this.onTransportsConnectedCallbacks.add(callback);
+
+    // If both transports are already connected, call the callback immediately
+    if (this.sendTransportConnected && this.recvTransportConnected) {
+      callback();
+    }
+  }
+
+  /**
+   * Unregister a transports connected callback
+   */
+  offTransportsConnected(callback: () => void): void {
+    this.onTransportsConnectedCallbacks.delete(callback);
+  }
+
+  /**
+   * Wait for both transports to be connected
+   */
+  async waitForTransportsConnected(): Promise<void> {
+    if (this.sendTransportConnected && this.recvTransportConnected) {
+      return;
+    }
+
+    // Create promises if not already created
+    if (!this.sendTransportConnectPromise) {
+      this.sendTransportConnectPromise = new Promise((resolve) => {
+        this.sendTransportConnectResolve = resolve;
+      });
+    }
+
+    if (!this.recvTransportConnectPromise) {
+      this.recvTransportConnectPromise = new Promise((resolve) => {
+        this.recvTransportConnectResolve = resolve;
+      });
+    }
+
+    await Promise.all([this.sendTransportConnectPromise, this.recvTransportConnectPromise]);
+  }
+
+  /**
+   * Check if both transports are connected
+   */
+  areTransportsConnected(): boolean {
+    return this.sendTransportConnected && this.recvTransportConnected;
+  }
+
+  /**
    * Close the WebRTC manager
    */
   close(): void {
+    // Clear callbacks
+    this.onTransportsConnectedCallbacks.clear();
+
+    // Close all data producers
+    for (const dataProducer of this.dataProducers.values()) {
+      dataProducer.close();
+    }
+    this.dataProducers.clear();
+
+    // Close all data consumers
+    for (const dataConsumer of this.dataConsumers.values()) {
+      dataConsumer.close();
+    }
+    this.dataConsumers.clear();
+
     // Close all producers
     for (const producer of this.producers.values()) {
       producer.close();

@@ -2,7 +2,13 @@
  * Client-specific types
  */
 
-import type { ConnectionState, TrackKind, DataPacket } from '@bytepulse/pulsewave-shared';
+import type {
+  ConnectionState,
+  TrackKind,
+  DataPacket,
+  DataProviderConfig,
+  DataProviderType,
+} from '@bytepulse/pulsewave-shared';
 
 /**
  * Room client options
@@ -50,6 +56,12 @@ export interface RoomClientOptions {
    * @default true
    */
   enableDataChannels?: boolean;
+
+  /**
+   * Data provider configuration
+   * If not specified, defaults to WebSocket provider
+   */
+  dataProvider?: DataProviderConfig | DataProviderType;
 
   /**
    * Maximum video bitrate (kbps)

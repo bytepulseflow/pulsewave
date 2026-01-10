@@ -116,6 +116,88 @@ export interface CreateWebRtcTransportMessage {
 }
 
 /**
+ * Create data producer message
+ */
+export interface CreateDataProducerMessage {
+  type: 'create_data_producer';
+  transportId: string;
+  label: string;
+  protocol?: string;
+  ordered?: boolean;
+  maxPacketLifeTime?: number;
+  maxRetransmits?: number;
+  sctpStreamParameters?: SctpStreamParameters;
+}
+
+/**
+ * Close data producer message
+ */
+export interface CloseDataProducerMessage {
+  type: 'close_data_producer';
+  dataProducerId: string;
+}
+
+/**
+ * Data producer created message
+ */
+export interface DataProducerCreatedMessage {
+  type: 'data_producer_created';
+  id: string;
+}
+
+/**
+ * Data producer closed message
+ */
+export interface DataProducerClosedMessage {
+  type: 'data_producer_closed';
+  dataProducerId: string;
+}
+
+/**
+ * Data consumer created message
+ */
+export interface DataConsumerCreatedMessage {
+  type: 'data_consumer_created';
+  id: string;
+  dataProducerId: string;
+  participantSid: string;
+  label: string;
+  protocol?: string;
+  ordered?: boolean;
+  sctpStreamParameters: SctpStreamParameters;
+}
+
+/**
+ * SCTP stream parameters
+ */
+export interface SctpStreamParameters {
+  streamId: number;
+  ordered?: boolean;
+  maxPacketLifeTime?: number;
+  maxRetransmits?: number;
+  label?: string;
+  protocol?: string;
+}
+
+/**
+ * SCTP capabilities
+ */
+export interface SctpCapabilities {
+  numStreams: {
+    OS: number;
+    MIS: number;
+  };
+}
+
+/**
+ * Data consumer closed message
+ */
+export interface DataConsumerClosedMessage {
+  type: 'data_consumer_closed';
+  dataConsumerId: string;
+}
+
+/**
  * Connect WebRTC transport message (new naming)
  */
 export interface ConnectWebRtcTransportMessage {
@@ -196,7 +278,9 @@ export type ClientMessage =
   | UnsubscribeMessage
   | ResumeConsumerMessage
   | MuteMessage
-  | DataMessage;
+  | DataMessage
+  | CreateDataProducerMessage
+  | CloseDataProducerMessage;
 
 // ============================================================================
 // Server -> Client Messages
@@ -230,6 +314,16 @@ export interface ParticipantLeftMessage {
 }
 
 /**
+ * SCTP parameters (for WebRTC data channels)
+ */
+export interface SctpParameters {
+  port: number;
+  OS: number;
+  MIS: number;
+  maxMessageSize: number;
+}
+
+/**
  * Transport created message
  */
 export interface TransportCreatedMessage {
@@ -238,6 +332,7 @@ export interface TransportCreatedMessage {
   iceParameters: IceParameters;
   iceCandidates: IceCandidate[];
   dtlsParameters: DtlsParameters;
+  sctpParameters?: SctpParameters;
   direction: 'send' | 'recv';
 }
 
@@ -351,6 +446,10 @@ export type ServerMessage =
   | TrackMutedMessage
   | TrackUnmutedMessage
   | DataReceivedMessage
+  | DataProducerCreatedMessage
+  | DataProducerClosedMessage
+  | DataConsumerCreatedMessage
+  | DataConsumerClosedMessage
   | ErrorMessage;
 
 // ============================================================================
