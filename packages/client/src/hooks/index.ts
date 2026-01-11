@@ -22,3 +22,4 @@ export {
 } from './useConnectionState';
 export { useDataChannel, useDataChannelListener } from './useDataChannel';
 export { useMediaDevices } from './useMediaDevices';
+export { useAudioAnalyzer, cleanupAllAudioAnalyzers } from './useAudioAnalyzer';

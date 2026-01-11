@@ -22,13 +22,11 @@ export class TrackUnpublishedHandler extends BaseHandler {
 
     const participant = client.getParticipant(participantSid) as RemoteParticipantImpl;
     if (participant) {
-      // Get the publication before removing it
+      // Get the publication
       const publication = participant.getTrack(trackSid);
 
-      // Remove the track from participant's tracks map
-      (participant as unknown as { tracks: Map<string, unknown> }).tracks.delete(trackSid);
-
-      // Emit track-unpublished event
+      // Clear the track but KEEP the publication in the tracks map
+      // This allows the publication to be reused when the track is re-published
       if (publication) {
         (publication as unknown as { clearTrack: () => void }).clearTrack();
         this.emit(context, 'track-unpublished', { publication, participant });

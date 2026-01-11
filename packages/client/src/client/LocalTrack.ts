@@ -18,6 +18,16 @@ export class LocalTrack extends Track {
    */
   private localListeners: Map<keyof LocalTrackEvents, Set<(data: unknown) => void>> = new Map();
 
+  /**
+   * Mute callback
+   */
+  private muteCallback?: () => Promise<void>;
+
+  /**
+   * Unmute callback
+   */
+  private unmuteCallback?: () => Promise<void>;
+
   constructor(info: TrackInfo, mediaTrack: MediaStreamTrack) {
     super(info, mediaTrack);
   }
@@ -27,7 +37,14 @@ export class LocalTrack extends Track {
    */
   async mute(): Promise<void> {
     if (!this.isMuted) {
+      this.info.muted = true;
       this.mediaTrack.enabled = false;
+
+      // Call mute callback (producer.pause())
+      if (this.muteCallback) {
+        await this.muteCallback();
+      }
+
       this.emitLocal('muted');
     }
   }
@@ -37,9 +54,30 @@ export class LocalTrack extends Track {
    */
   async unmute(): Promise<void> {
     if (this.isMuted) {
+      this.info.muted = false;
       this.mediaTrack.enabled = true;
+
+      // Call unmute callback (producer.resume())
+      if (this.unmuteCallback) {
+        await this.unmuteCallback();
+      }
+
       this.emitLocal('unmuted');
     }
+  }
+
+  /**
+   * Set mute callback
+   */
+  setMuteCallback(callback: () => Promise<void>): void {
+    this.muteCallback = callback;
+  }
+
+  /**
+   * Set unmute callback
+   */
+  setUnmuteCallback(callback: () => Promise<void>): void {
+    this.unmuteCallback = callback;
   }
 
   /**

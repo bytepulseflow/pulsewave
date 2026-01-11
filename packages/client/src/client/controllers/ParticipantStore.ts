@@ -6,9 +6,9 @@
  */
 
 import type { RemoteParticipant, RemoteTrackPublication } from '../../types';
-import type { LocalTrackPublication } from '../../types';
 import { LocalParticipantImpl } from '../LocalParticipant';
 import { RemoteParticipantImpl } from '../Participant';
+import { LocalTrackPublicationImpl } from '../TrackPublication';
 
 /**
  * ParticipantStore - Manages participant state
@@ -35,14 +35,11 @@ export class ParticipantStore {
    * Add local track publication to local participant
    * Intent-based method - encapsulates track management
    */
-  addLocalTrack(publication: LocalTrackPublication): void {
+  addLocalTrack(publication: LocalTrackPublicationImpl): void {
     if (!this.localParticipant) {
       throw new Error('Local participant not set');
     }
-    (this.localParticipant.tracks as Map<string, LocalTrackPublication>).set(
-      publication.sid,
-      publication
-    );
+    this.localParticipant.tracks.set(publication.sid, publication);
 
     // Emit track-published event to trigger React re-renders
     (this.localParticipant as unknown as { emit: (event: string, data: unknown) => void }).emit(
@@ -55,15 +52,14 @@ export class ParticipantStore {
    * Remove local track publication by producer ID
    * Intent-based method - encapsulates track management
    */
-  removeLocalTrackByProducerId(producerId: string): LocalTrackPublication | null {
+  removeLocalTrackByProducerId(producerId: string): LocalTrackPublicationImpl | null {
     if (!this.localParticipant) {
       return null;
     }
 
-    const tracks = this.localParticipant.tracks as Map<string, LocalTrackPublication>;
-    for (const [sid, publication] of tracks.entries()) {
+    for (const [sid, publication] of this.localParticipant.tracks.entries()) {
       if (sid === producerId) {
-        tracks.delete(sid);
+        this.localParticipant.tracks.delete(sid);
 
         // Emit track-unpublished event to trigger React re-renders
         (this.localParticipant as unknown as { emit: (event: string, data: unknown) => void }).emit(
@@ -80,13 +76,12 @@ export class ParticipantStore {
   /**
    * Get local track publication by producer ID
    */
-  getLocalTrackByProducerId(producerId: string): LocalTrackPublication | null {
+  getLocalTrackByProducerId(producerId: string): LocalTrackPublicationImpl | null {
     if (!this.localParticipant) {
       return null;
     }
 
-    const tracks = this.localParticipant.tracks as Map<string, LocalTrackPublication>;
-    return tracks.get(producerId) ?? null;
+    return this.localParticipant.tracks.get(producerId) ?? null;
   }
 
   /**

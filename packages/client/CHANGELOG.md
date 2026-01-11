@@ -1,5 +1,13 @@
 # @bytepulse/pulsewave-client
 
+## 0.3.7
+
+### Patch Changes
+
+- Fixing video/audio play/pause issue, Adding speaker visualization animation to built-in components, adding PulseParticipantView, PulseMediaTrack, AvatarPulse
+- Updated dependencies
+  - @bytepulse/pulsewave-shared@0.2.4
+
 ## 0.3.6
 
 ### Patch Changes

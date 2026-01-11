@@ -21,13 +21,19 @@ export class TrackPublishedHandler extends BaseHandler {
 
     const participant = client.getParticipant(participantSid) as RemoteParticipantImpl;
     if (participant) {
+      const trackSid = trackPublishedMessage.track.sid;
+
       // Update participant with new track
       const info = participant.getInfo();
-      info.tracks.push(trackPublishedMessage.track);
+
+      // Only add if not already in the list (to avoid duplicates)
+      if (!info.tracks.some((t) => t.sid === trackSid)) {
+        info.tracks.push(trackPublishedMessage.track);
+      }
+
       participant.updateInfo(info);
 
       // Emit track published event
-      const trackSid = trackPublishedMessage.track.sid;
       this.emit(context, 'track-published', {
         publication: trackPublishedMessage.track,
         participant,
@@ -37,7 +43,7 @@ export class TrackPublishedHandler extends BaseHandler {
       if (client.options.autoSubscribe !== false) {
         // Initialize WebRTC if not already initialized
         client.ensureWebRTCInitialized().then(() => {
-          // Subscribe to the new track
+          // Subscribe to the track (even if it's a re-publication)
           client
             .subscribeToTrack(trackSid)
             .then(() => logger.debug(`Auto-subscribed to track ${trackSid}`))

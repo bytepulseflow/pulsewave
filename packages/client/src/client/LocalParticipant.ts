@@ -28,7 +28,11 @@ export class LocalParticipantImpl implements LocalParticipant {
   public metadata: Record<string, unknown>;
   public readonly isLocal = true as const;
 
-  public tracks: Map<string, LocalTrackPublicationImpl> = new Map();
+  /**
+   * Track publications map - accessible by components
+   */
+  public readonly tracks: Map<string, LocalTrackPublicationImpl> = new Map();
+
   protected listeners: Map<keyof LocalParticipantEvents, Set<(data: unknown) => void>> = new Map();
 
   private publishCallback?: (track: LocalTrack, options?: TrackPublishOptions) => Promise<void>;
@@ -185,6 +189,46 @@ export class LocalParticipantImpl implements LocalParticipant {
   async disableMicrophone(): Promise<void> {
     if (this.disableMicrophoneCallback) {
       await this.disableMicrophoneCallback();
+    }
+  }
+
+  /**
+   * Mute audio track (pause producer without unpublishing)
+   */
+  async muteAudio(): Promise<void> {
+    const audioTrack = Array.from(this.tracks.values()).find((t) => t.kind === 'audio');
+    if (audioTrack?.track) {
+      await audioTrack.track.mute();
+    }
+  }
+
+  /**
+   * Unmute audio track (resume producer without republishing)
+   */
+  async unmuteAudio(): Promise<void> {
+    const audioTrack = Array.from(this.tracks.values()).find((t) => t.kind === 'audio');
+    if (audioTrack?.track) {
+      await audioTrack.track.unmute();
+    }
+  }
+
+  /**
+   * Mute video track (pause producer without unpublishing)
+   */
+  async muteVideo(): Promise<void> {
+    const videoTrack = Array.from(this.tracks.values()).find((t) => t.kind === 'video');
+    if (videoTrack?.track) {
+      await videoTrack.track.mute();
+    }
+  }
+
+  /**
+   * Unmute video track (resume producer without republishing)
+   */
+  async unmuteVideo(): Promise<void> {
+    const videoTrack = Array.from(this.tracks.values()).find((t) => t.kind === 'video');
+    if (videoTrack?.track) {
+      await videoTrack.track.unmute();
     }
   }
 
