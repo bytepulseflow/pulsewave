@@ -6,12 +6,7 @@
  */
 
 import { TrackSource, TrackKind } from '@bytepulse/pulsewave-shared';
-import type {
-  RemoteTrack,
-  RemoteTrackPublication,
-  TrackSubscribeOptions,
-  LocalTrackPublication,
-} from '../../types';
+import type { RemoteTrack, RemoteTrackPublication, TrackSubscribeOptions } from '../../types';
 import { RemoteTrack as RemoteTrackImpl } from '../RemoteTrack';
 import { LocalTrack as LocalTrackImpl } from '../LocalTrack';
 import { LocalTrackPublicationImpl } from '../TrackPublication';
@@ -60,8 +55,8 @@ export class TrackController {
         sid: string;
         identity: string;
       } | null;
-      addLocalTrack: (publication: LocalTrackPublication) => void;
-      removeLocalTrackByProducerId: (producerId: string) => LocalTrackPublication | null;
+      addLocalTrack: (publication: LocalTrackPublicationImpl) => void;
+      removeLocalTrackByProducerId: (producerId: string) => LocalTrackPublicationImpl | null;
     },
     private readonly emitEvent: (event: string, data: unknown) => void
   ) {}

@@ -59,7 +59,236 @@ For more details on server, visit the [PulseWave Server GitHub Repository](https
 
 PulseWave Client SDK provides two approaches for building video/audio applications:
 
-### Option 1: Hooks-Based API Usage
+### Option 1: Built-in Component-Based Usage
+
+Use the pre-built components for quick setup with minimal code:
+
+```tsx
+import { useState } from 'react';
+import {
+  RoomProvider,
+  useRoom,
+  useLocalParticipant,
+  useParticipants,
+  useConnectionState,
+  PulseParticipantView,
+} from '@bytepulse/pulsewave-client';
+import { DataProviderType } from '@bytepulse/pulsewave-shared';
+
+function VideoRoom() {
+  const { disconnect, localTracks } = useRoom();
+  const localParticipant = useLocalParticipant();
+  const participants = useParticipants();
+  const connectionState = useConnectionState();
+
+  const toggleCamera = async () => {
+    if (localParticipant) {
+      const hasVideo = localParticipant.getTracks().some((t) => t.kind === 'video');
+      if (hasVideo) {
+        await localParticipant.disableCamera();
+      } else {
+        await localParticipant.enableCamera();
+      }
+    }
+  };
+
+  const toggleMicrophone = async () => {
+    if (localParticipant) {
+      const audioTrack = localParticipant.getTracks().find((t) => t.kind === 'audio');
+      if (audioTrack) {
+        if (audioTrack.track?.isMuted) {
+          await localParticipant.unmuteAudio();
+        } else {
+          await localParticipant.muteAudio();
+        }
+      } else {
+        await localParticipant.enableMicrophone();
+      }
+    }
+  };
+
+  return (
+    <div className="video-room w-full bg-slate-950 h-screen pt-8">
+      <div className="relative">
+        {connectionState === 'connected' && (
+          <div className="participants">
+            {/* Local Participant */}
+            {localParticipant && (
+              <div className=" mx-auto w-[40%]">
+                <PulseParticipantView
+                  key={`local-${localTracks.length}`}
+                  objectFit="fill"
+                  className=""
+                  participant={localParticipant}
+                />
+              </div>
+            )}
+
+            {/* Remote Participants */}
+            {participants.map((participant) => {
+              return (
+                <div key={participant.sid} className="w-1/4">
+                  <PulseParticipantView objectFit="fill" participant={participant} />
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      <div className="controls absolute w-full flex justify-center items-center mx-auto bottom-14 z-10">
+        <button
+          className="bg-slate-800 text-white py-2 px-4 rounded-2xl"
+          onClick={disconnect}
+          disabled={connectionState === 'disconnected'}
+        >
+          Leave Room
+        </button>
+        <button className="bg-slate-800 text-white py-2 px-4 rounded-2xl" onClick={toggleCamera}>
+          Toggle Camera
+        </button>
+        <button
+          className="bg-slate-800 text-white py-2 px-4 rounded-2xl"
+          onClick={toggleMicrophone}
+        >
+          Toggle Mic
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  const [username, setUsername] = useState('');
+  const [roomName, setRoomName] = useState('');
+  const [token, setToken] = useState('');
+  const [isJoined, setIsJoined] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  // Function to generate token from API
+  const generateToken = async (identity: string, room: string, name: string) => {
+    try {
+      const response = await fetch('http://localhost:3000/api/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          identity,
+          name,
+          room,
+          canPublish: true,
+          canSubscribe: true,
+          canPublishData: true,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate token');
+      }
+
+      const data = await response.json();
+      return data.token;
+    } catch (err) {
+      throw new Error('Failed to generate access token. Please ensure the server is running.');
+    }
+  };
+
+  const handleJoin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!username || !roomName) {
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const generatedToken = await generateToken(username, roomName, username);
+      setToken(generatedToken);
+      setIsJoined(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLeave = () => {
+    setIsJoined(false);
+    setToken('');
+    setError('');
+  };
+
+  return (
+    <div className="h-full">
+      {!isJoined ? (
+        <form
+          onSubmit={handleJoin}
+          className="flex items-center max-w-80 mx-auto justify-center flex-col space-y-4 h-screen"
+        >
+          <h2>Join a Room</h2>
+          {error && <div>{error}</div>}
+          <div className="w-full">
+            <label className="block" htmlFor="username">
+              Username
+            </label>
+            <input
+              id="username"
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Enter your name"
+              required
+              className="border rounded-sm p-1 w-full"
+              disabled={isLoading}
+            />
+          </div>
+          <div className="w-full">
+            <label className="block" htmlFor="roomName">
+              Room Name
+            </label>
+            <input
+              id="roomName"
+              type="text"
+              value={roomName}
+              onChange={(e) => setRoomName(e.target.value)}
+              placeholder="Enter room name"
+              required
+              className="border rounded-sm p-1 w-full"
+              disabled={isLoading}
+            />
+          </div>
+          <button
+            className="bg-slate-900 px-4 py-2 text-white rounded-xl w-full"
+            type="submit"
+            disabled={isLoading}
+          >
+            {isLoading ? 'Generating Token...' : 'Join'}
+          </button>
+        </form>
+      ) : (
+        <RoomProvider
+          autoConnect
+          options={{
+            url: 'ws://localhost:3000',
+            room: roomName,
+            token: token,
+            dataProvider: {
+              type: DataProviderType.WebRTC,
+            },
+          }}
+        >
+          <VideoRoom />
+          <button onClick={handleLeave}>Leave Room</button>
+        </RoomProvider>
+      )}
+    </div>
+  );
+}
+```
+
+### Option 2: Hooks-Based API Usage
 
 Build custom UI using hooks for full control:
 
@@ -75,13 +304,12 @@ import {
 import { VideoTrack, AudioTrack } from '@bytepulse/pulsewave-client/ui';
 
 function VideoRoom() {
-  const { connect, disconnect } = useRoom();
+  const { disconnect } = useRoom();
   const localParticipant = useLocalParticipant();
   const participants = useParticipants();
   const connectionState = useConnectionState();
 
   useEffect(() => {
-    connect();
     return () => {
       disconnect();
     };
@@ -259,6 +487,7 @@ export default function App() {
         </form>
       ) : (
         <RoomProvider
+          autoConnect
           options={{
             url: 'ws://localhost:3000',
             room: roomName,
@@ -274,51 +503,181 @@ export default function App() {
 }
 ```
 
-### Option 2: Built-in Component-Based Usage
+### Option 3: Manual Track Attachment
 
-> **NOTE: Under active development**
-
-Use the pre-built components for quick setup with minimal code:
+For complete control, manually attach tracks to video elements:
 
 ```tsx
-import { useRoom } from '@bytepulse/pulsewave-client';
-import { RoomProvider, RoomView, LocalParticipantView } from '@bytepulse/pulsewave-client/ui';
+import { useState, useRef, useEffect } from 'react';
+import {
+  RoomProvider,
+  useRoom,
+  useLocalParticipant,
+  useParticipants,
+  useConnectionState,
+} from '@bytepulse/pulsewave-client';
+import { DataProviderType } from '@bytepulse/pulsewave-shared';
 
-function VideoRoom() {
-  const { connect, disconnect, connectionState } = useRoom();
+function ManualVideoRoom() {
+  const { disconnect } = useRoom();
+  const localParticipant = useLocalParticipant();
+  const participants = useParticipants();
+  const connectionState = useConnectionState();
+
+  // Refs for video elements
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
+
+  // State for camera/mic status
+  const [isCameraEnabled, setIsCameraEnabled] = useState(false);
+  const [isMicEnabled, setIsMicEnabled] = useState(false);
+
+  // Toggle camera
+  const toggleCamera = async () => {
+    if (!localParticipant) return;
+
+    if (isCameraEnabled) {
+      await localParticipant.disableCamera();
+      setIsCameraEnabled(false);
+    } else {
+      await localParticipant.enableCamera();
+      setIsCameraEnabled(true);
+    }
+  };
+
+  // Toggle microphone
+  const toggleMicrophone = async () => {
+    if (!localParticipant) return;
+
+    if (isMicEnabled) {
+      await localParticipant.disableMicrophone();
+      setIsMicEnabled(false);
+    } else {
+      await localParticipant.enableMicrophone();
+      setIsMicEnabled(true);
+    }
+  };
+
+  // Attach local video track to video element
+  useEffect(() => {
+    if (!localParticipant || !localVideoRef.current) return;
+
+    const tracks = localParticipant.getTracks();
+    const videoTrack = tracks.find((t) => t.kind === 'video');
+
+    if (videoTrack?.track?.mediaTrack) {
+      const stream = new MediaStream([videoTrack.track.mediaTrack]);
+      localVideoRef.current.srcObject = stream;
+      localVideoRef.current.muted = true; // Mute local video to prevent feedback
+      localVideoRef.current.play().catch(console.error);
+    } else {
+      localVideoRef.current.srcObject = null;
+    }
+  }, [localParticipant, isCameraEnabled]);
+
+  // Attach local audio track to audio element
+  useEffect(() => {
+    if (!localParticipant || !localAudioRef.current) return;
+
+    const tracks = localParticipant.getTracks();
+    const audioTrack = tracks.find((t) => t.kind === 'audio');
+
+    if (audioTrack?.track?.mediaTrack) {
+      const stream = new MediaStream([audioTrack.track.mediaTrack]);
+      localAudioRef.current.srcObject = stream;
+      localAudioRef.current.muted = true; // Mute local audio to prevent feedback
+      localAudioRef.current.play().catch(console.error);
+    } else {
+      localAudioRef.current.srcObject = null;
+    }
+  }, [localParticipant, isMicEnabled]);
+
+  // Attach remote video tracks
+  useEffect(() => {
+    participants.forEach((participant) => {
+      const tracks = participant.getTracks();
+      const videoTrack = tracks.find((t) => t.kind === 'video');
+
+      const videoElement = remoteVideoRefs.current.get(participant.sid);
+      if (videoElement && videoTrack?.track?.mediaTrack) {
+        const stream = new MediaStream([videoTrack.track.mediaTrack]);
+        videoElement.srcObject = stream;
+        videoElement.play().catch(console.error);
+      }
+    });
+  }, [participants]);
+
+  // Attach remote audio tracks
+  useEffect(() => {
+    participants.forEach((participant) => {
+      const tracks = participant.getTracks();
+      const audioTrack = tracks.find((t) => t.kind === 'audio');
+
+      const audioElement = remoteAudioRefs.current.get(participant.sid);
+      if (audioElement && audioTrack?.track?.mediaTrack) {
+        const stream = new MediaStream([audioTrack.track.mediaTrack]);
+        audioElement.srcObject = stream;
+        audioElement.play().catch(console.error);
+      }
+    });
+  }, [participants]);
 
   return (
-    <div>
+    <div className="video-room">
       <div className="controls">
-        <button onClick={connect} disabled={connectionState === 'connected'}>
-          Join Room
+        <button onClick={disconnect}>Leave Room</button>
+        <button onClick={toggleCamera}>
+          {isCameraEnabled ? 'Disable Camera' : 'Enable Camera'}
         </button>
-        <button onClick={disconnect} disabled={connectionState === 'disconnected'}>
-          Leave Room
-        </button>
+        <button onClick={toggleMicrophone}>{isMicEnabled ? 'Disable Mic' : 'Enable Mic'}</button>
       </div>
 
       {connectionState === 'connected' && (
-        <div className="room">
-          <LocalParticipantView />
-          <RoomView />
+        <div className="participants">
+          {/* Local Participant */}
+          {localParticipant && (
+            <div className="participant local">
+              <h3>You (Local)</h3>
+              <video
+                ref={localVideoRef}
+                className="w-full h-64 object-cover bg-black"
+                autoPlay
+                playsInline
+                muted
+              />
+              {/* Hidden audio element for local audio */}
+              <audio ref={localAudioRef} autoPlay muted />
+            </div>
+          )}
+
+          {/* Remote Participants */}
+          {participants.map((participant) => (
+            <div key={participant.sid} className="participant">
+              <h3>{participant.name || participant.identity}</h3>
+              <video
+                ref={(el) => {
+                  if (el) {
+                    remoteVideoRefs.current.set(participant.sid, el);
+                  }
+                }}
+                className="w-full h-48 object-cover bg-black"
+                autoPlay
+                playsInline
+              />
+              {/* Hidden audio element for remote audio */}
+              <audio
+                ref={(el) => {
+                  if (el) {
+                    remoteAudioRefs.current.set(participant.sid, el);
+                  }
+                }}
+                autoPlay
+              />
+            </div>
+          ))}
         </div>
       )}
     </div>
-  );
-}
-
-function App() {
-  return (
-    <RoomProvider
-      options={{
-        url: 'ws://localhost:3000',
-        room: 'my-room',
-        token: 'your-token',
-      }}
-    >
-      <VideoRoom />
-    </RoomProvider>
   );
 }
 ```
@@ -328,14 +687,7 @@ function App() {
 All UI components can be imported from `@bytepulse/pulsewave-client/ui`:
 
 ```tsx
-import {
-  RoomProvider,
-  RoomView,
-  ParticipantView,
-  LocalParticipantView,
-  VideoTrack,
-  AudioTrack,
-} from '@bytepulse/pulsewave-client/ui';
+import { PulseParticipantView, VideoTrack, AudioTrack } from '@bytepulse/pulsewave-client/ui';
 ```
 
 ### RoomProvider
@@ -343,7 +695,7 @@ import {
 The main provider component that wraps your application and provides room context.
 
 ```tsx
-import { RoomProvider } from '@bytepulse/pulsewave-client/ui';
+import { RoomProvider } from '@bytepulse/pulsewave-client';
 
 <RoomProvider
   options={{
@@ -374,36 +726,6 @@ Component for rendering audio tracks (hidden).
 import { AudioTrack } from '@bytepulse/pulsewave-client/ui';
 
 <AudioTrack track={track} />;
-```
-
-### ParticipantView
-
-Component for rendering a participant with their tracks.
-
-```tsx
-import { ParticipantView } from '@bytepulse/pulsewave-client/ui';
-
-<ParticipantView participant={participant} />;
-```
-
-### LocalParticipantView
-
-Component for rendering local participant with controls.
-
-```tsx
-import { LocalParticipantView } from '@bytepulse/pulsewave-client/ui';
-
-<LocalParticipantView participant={localParticipant} />;
-```
-
-### RoomView
-
-Component for rendering all participants in a room.
-
-```tsx
-import { RoomView } from '@bytepulse/pulsewave-client/ui';
-
-<RoomView />;
 ```
 
 ## Hooks

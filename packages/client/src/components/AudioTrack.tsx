@@ -4,7 +4,7 @@
 
 import { useEffect, useRef } from 'react';
 import type { RemoteTrack, LocalTrack } from '../types';
-import './styles.css';
+
 interface AudioTrackProps {
   track: RemoteTrack | LocalTrack;
   onAudioElement?: (element: HTMLAudioElement | null) => void;

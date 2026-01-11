@@ -559,6 +559,11 @@ export interface Participant {
   isLocal: boolean;
 
   /**
+   * Track publications map
+   */
+  tracks: Map<string, RemoteTrackPublication>;
+
+  /**
    * Get all track publications
    */
   getTracks(): RemoteTrackPublication[];
@@ -599,12 +604,17 @@ export interface Participant {
  */
 export interface LocalParticipant extends Omit<
   Participant,
-  'isLocal' | 'getTracks' | 'getTrack' | 'getTrackByName' | 'on' | 'off'
+  'isLocal' | 'tracks' | 'getTracks' | 'getTrack' | 'getTrackByName' | 'on' | 'off'
 > {
   /**
    * Override isLocal to true
    */
   isLocal: true;
+
+  /**
+   * Track publications map
+   */
+  tracks: Map<string, LocalTrackPublication>;
 
   /**
    * Get all track publications

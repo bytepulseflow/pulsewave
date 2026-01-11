@@ -28,7 +28,11 @@ export class LocalParticipantImpl implements LocalParticipant {
   public metadata: Record<string, unknown>;
   public readonly isLocal = true as const;
 
-  public tracks: Map<string, LocalTrackPublicationImpl> = new Map();
+  /**
+   * Track publications map - accessible by components
+   */
+  public readonly tracks: Map<string, LocalTrackPublicationImpl> = new Map();
+
   protected listeners: Map<keyof LocalParticipantEvents, Set<(data: unknown) => void>> = new Map();
 
   private publishCallback?: (track: LocalTrack, options?: TrackPublishOptions) => Promise<void>;

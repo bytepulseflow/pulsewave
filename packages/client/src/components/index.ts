@@ -3,9 +3,5 @@
  */
 
 export { VideoTrack } from './VideoTrack';
-export { AudioTrack } from './AudioTrack';
 export { PulseMediaTrack } from './PulseMediaTrack';
 export { PulseParticipantView } from './PulseParticipantView';
-export { ParticipantView } from './ParticipantView';
-export { LocalParticipantView } from './LocalParticipantView';
-export { RoomView } from './RoomView';

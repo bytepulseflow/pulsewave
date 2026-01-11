@@ -26,7 +26,11 @@ export class ParticipantImpl implements Participant {
   public metadata: Record<string, unknown>;
   public readonly isLocal: boolean = false;
 
-  protected tracks: Map<string, RemoteTrackPublicationImpl> = new Map();
+  /**
+   * Track publications map - accessible by components
+   */
+  public readonly tracks: Map<string, RemoteTrackPublicationImpl> = new Map();
+
   protected listeners: Map<keyof ParticipantEvents, Set<(data: unknown) => void>> = new Map();
   protected info: ParticipantInfo;
 

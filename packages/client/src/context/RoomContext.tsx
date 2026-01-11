@@ -203,6 +203,13 @@ export function RoomProvider({
         setParticipants((prev) => [...prev]);
       });
 
+      // Listen for track unpublish events to update participants state
+      // This is needed when a remote participant disables their camera/mic
+      roomClient.on('track-unpublished', () => {
+        // Force re-render by updating participants with a new array reference
+        setParticipants((prev) => [...prev]);
+      });
+
       roomClient.on('error', (err: Error) => {
         setError(err);
         onError?.(err);

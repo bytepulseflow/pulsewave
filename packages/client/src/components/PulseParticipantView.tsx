@@ -1,8 +1,5 @@
 /**
  * PulseParticipantView - Simplified component for rendering a participant with all their tracks
- *
- * Uses centralized audio analyzer for efficient resource usage.
- * Analyzes audio once per participant and passes results to child components.
  */
 
 import { useMemo } from 'react';
@@ -11,6 +8,9 @@ import { TrackSource } from '@bytepulse/pulsewave-shared';
 import { PulseMediaTrack } from './PulseMediaTrack';
 import { AvatarPulse } from './AvatarPulse';
 import { useAudioAnalyzer } from '../hooks/useAudioAnalyzer';
+import { createModuleLogger } from '../utils/logger';
+
+const logger = createModuleLogger('PulseParticipantView');
 
 interface PulseParticipantViewProps {
   /** The participant to render (local or remote) */
@@ -53,24 +53,40 @@ export function PulseParticipantView({
   onAudioElement,
   speakingThreshold = 20,
 }: PulseParticipantViewProps): JSX.Element {
+  const trackCount = participant.tracks.size;
   const tracks = participant.getTracks();
+
+  const getTrackStateKey = () => {
+    const trackStates = tracks.map((pub) => `${pub.sid}:${pub.track ? '1' : '0'}`).join(',');
+    return `${participant.sid}-${trackCount}-${trackStates}`;
+  };
+
+  const participantKey = getTrackStateKey();
 
   const isLocal = participant.isLocal;
 
-  // Memoize track lookups to avoid repeated iterations
   const trackInfo = useMemo(() => {
     const videoPublication = tracks.find(
       (t) => t.kind === 'video' && t.source !== TrackSource.ScreenShare
     );
     const audioPublication = tracks.find((t) => t.kind === 'audio');
-    // Only consider having video if the publication has an actual track
     const hasVideo = !!videoPublication?.track;
+
+    logger.debug('Track info computed', {
+      participantSid: participant.sid,
+      trackCount,
+      hasVideo,
+      videoTrackSid: videoPublication?.sid,
+      videoHasTrack: !!videoPublication?.track,
+      audioTrackSid: audioPublication?.sid,
+      audioHasTrack: !!audioPublication?.track,
+    });
+
     return { hasVideo, videoPublication, audioPublication };
-  }, [tracks, participant.sid]);
+  }, [tracks, trackCount, participantKey]);
 
   const { hasVideo, videoPublication, audioPublication } = trackInfo;
 
-  // Analyze audio once per participant
   const audioMetrics = useAudioAnalyzer({
     track: audioPublication?.track?.mediaTrack ?? null,
     speakingThreshold,
@@ -81,6 +97,7 @@ export function PulseParticipantView({
 
   return (
     <div
+      key={participantKey}
       className={`pulsewave-participant ${audioMetrics.isSpeaking ? 'pulsewave-participant--speaking' : ''} ${className}`}
     >
       <div className="pulsewave-participant__media">
@@ -129,7 +146,7 @@ export function PulseParticipantView({
           )}
 
           {/* Mic off badge */}
-          {audioPublication?.track?.isMuted && (
+          {(!audioPublication || audioPublication?.track?.isMuted) && (
             <span className="pulsewave-badge pulsewave-badge--mic-off">
               <svg
                 width="16"
