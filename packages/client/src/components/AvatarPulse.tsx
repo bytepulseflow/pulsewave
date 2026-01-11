@@ -22,13 +22,11 @@ export function AvatarPulse({ audioTrack, rings: ringsProp, avatarUrl, fallbackN
     ring3: 0,
   });
 
-  // Use centralized audio analyzer if rings not provided
   const { rings: analyzerRings } = useAudioAnalyzer({
     track: audioTrack ?? null,
     speakingThreshold: 20,
   });
 
-  // Update rings from analyzer or props
   useEffect(() => {
     if (ringsProp) {
       setRings(ringsProp);

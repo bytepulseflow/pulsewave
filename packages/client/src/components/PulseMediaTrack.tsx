@@ -1,7 +1,6 @@
 /**
  * PulseMediaTrack - Unified component for rendering audio and video tracks
  *
- * Properly handles track attachment with separate stream refs and efficient reuse.
  * Does NOT stop tracks - they are managed by mediasoup producer/consumer.
  */
 
@@ -49,7 +48,6 @@ export function PulseMediaTrack({
   // Attach video track
   useEffect(() => {
     if (kind !== 'video') {
-      // Not a video track - cleanup
       if (videoRef.current) {
         videoRef.current.srcObject = null;
         setIsVideoLoaded(false);
@@ -60,7 +58,6 @@ export function PulseMediaTrack({
     }
 
     if (!track) {
-      // Video track doesn't exist (camera disabled) - cleanup and show avatar
       if (videoRef.current) {
         videoRef.current.srcObject = null;
         setIsVideoLoaded(false);
@@ -78,19 +75,15 @@ export function PulseMediaTrack({
     // Reuse existing stream if track hasn't changed
     const currentTrackId = videoStreamRef.current?.getTracks()[0]?.id;
     if (videoStreamRef.current && currentTrackId === track.mediaTrack.id) {
-      // Track hasn't changed, just update muted state
       videoElement.muted = muted;
       return;
     }
 
-    // Clean up old stream reference (don't stop tracks - they're managed by mediasoup)
     videoStreamRef.current = null;
 
-    // Create new stream with the track
     const stream = new MediaStream([track.mediaTrack]);
     videoStreamRef.current = stream;
 
-    // Reset states
     setIsVideoLoaded(false);
     setHasVideoError(false);
 
@@ -125,7 +118,6 @@ export function PulseMediaTrack({
   // Attach audio track
   useEffect(() => {
     if (kind !== 'audio' || !track) {
-      // Cleanup if no track - just clear srcObject, don't stop tracks
       if (audioRef.current) {
         audioRef.current.srcObject = null;
       }
@@ -136,18 +128,14 @@ export function PulseMediaTrack({
     const audioElement = audioRef.current;
     if (!audioElement) return;
 
-    // Reuse existing stream if track hasn't changed
     const currentTrackId = audioStreamRef.current?.getTracks()[0]?.id;
     if (audioStreamRef.current && currentTrackId === track.mediaTrack.id) {
-      // Track hasn't changed, just update muted state
       audioElement.muted = muted || !track.mediaTrack.enabled;
       return;
     }
 
-    // Clean up old stream reference (don't stop tracks - they're managed by mediasoup)
     audioStreamRef.current = null;
 
-    // Create new stream with the track
     const stream = new MediaStream([track.mediaTrack]);
     audioStreamRef.current = stream;
 
@@ -188,7 +176,6 @@ export function PulseMediaTrack({
     }
   }, [kind, onAudioElement]);
 
-  // Show avatar if no publication or no track (camera disabled)
   if (!publication || !track) {
     return (
       <div className="no-video-container">

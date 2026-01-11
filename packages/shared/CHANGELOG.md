@@ -1,5 +1,11 @@
 # @bytepulse/pulsewave-shared
 
+## 0.2.4
+
+### Patch Changes
+
+- Fixing video/audio play/pause issue, Adding speaker visualization animation to built-in components, adding PulseParticipantView, PulseMediaTrack, AvatarPulse
+
 ## 0.2.3
 
 ### Patch Changes
