@@ -5,7 +5,8 @@
 import { BaseHandler } from './BaseHandler';
 import type { HandlerContext } from './types';
 import type { CallReceivedMessage } from '@bytepulse/pulsewave-shared';
-import type { CallInfo, Participant } from '../../types';
+import type { CallInfo } from '../../types';
+import { RemoteParticipantImpl } from '../Participant';
 import { createModuleLogger } from '../../utils/logger';
 
 const logger = createModuleLogger('handler:call-received');
@@ -17,27 +18,20 @@ export class CallReceivedHandler extends BaseHandler {
     const { callId, caller, metadata } = message;
 
     // Get or create participant from store
-    let participant: Participant | null = context.client.getParticipant(caller.sid);
+    let participant = context.client.getParticipant(caller.sid);
 
     if (!participant) {
       // Create a new participant entry for the caller
-      participant = {
+      const newParticipant = new RemoteParticipantImpl({
         sid: caller.sid,
         identity: caller.identity,
         name: caller.name || caller.identity,
         state: caller.state,
         metadata: caller.metadata || {},
-        isLocal: false,
-        tracks: new Map(),
-        getTracks: () => [],
-        getTrack: () => undefined,
-        getTrackByName: () => undefined,
-        setMetadata: async () => {},
-        on: () => {},
-        off: () => {},
-        removeAllListeners: () => {},
-      };
-      context.client.addParticipant(participant as any);
+        tracks: [],
+      });
+      context.client.addParticipant(newParticipant);
+      participant = newParticipant;
     }
 
     // Create call info
@@ -45,7 +39,7 @@ export class CallReceivedHandler extends BaseHandler {
       callId,
       callerSid: caller.sid,
       targetSid: context.client.getLocalParticipant()?.sid || '',
-      caller: participant,
+      caller: participant || undefined,
       metadata,
       state: 'pending',
       startTime: Date.now(),

@@ -23,3 +23,6 @@ export {
 export { useDataChannel, useDataChannelListener } from './useDataChannel';
 export { useMediaDevices } from './useMediaDevices';
 export { useAudioAnalyzer, cleanupAllAudioAnalyzers } from './useAudioAnalyzer';
+export { useCalls } from './useCalls';
+export { useIncomingCall } from './useIncomingCall';
+export { useCallActions } from './useCallActions';

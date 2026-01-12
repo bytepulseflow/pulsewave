@@ -2,26 +2,13 @@
  * Reject call message handler
  */
 
-import { CLIENT_EVENTS, ErrorCode, CallState } from '@bytepulse/pulsewave-shared';
+import { CLIENT_EVENTS, ErrorCode } from '@bytepulse/pulsewave-shared';
 import { BaseHandler } from './BaseHandler';
 import type { HandlerContext } from './types';
 import type { RejectCallMessage } from '@bytepulse/pulsewave-shared';
 import { createModuleLogger } from '../../utils/logger';
 
 const logger = createModuleLogger('handler:reject-call');
-
-/**
- * Call info stored in room
- */
-interface RoomCallInfo {
-  callId: string;
-  callerSid: string;
-  targetSid: string;
-  state: CallState;
-  startTime: number;
-  endTime?: number;
-  metadata?: Record<string, unknown>;
-}
 
 export class RejectCallHandler extends BaseHandler {
   public readonly type = CLIENT_EVENTS.REJECT_CALL;
@@ -44,7 +31,7 @@ export class RejectCallHandler extends BaseHandler {
     }
 
     // Find the call
-    const call = this.getCallById(room, callId);
+    const call = room.getCall(callId);
     if (!call) {
       this.sendError(context.ws, ErrorCode.CallNotFound, 'Call not found');
       return;
@@ -57,13 +44,13 @@ export class RejectCallHandler extends BaseHandler {
     }
 
     // Validate call state
-    if (call.state !== CallState.Pending) {
+    if (call.state !== 'pending') {
       this.sendError(context.ws, ErrorCode.InvalidCallState, 'Call is not in pending state');
       return;
     }
 
-    // Update call state to ended
-    this.updateCallStateInRoom(room, callId, CallState.Rejected);
+    // Update call state to rejected
+    room.updateCall(callId, { state: 'rejected', endTime: Date.now() });
 
     // Get caller's WebSocket connection
     const caller = room.getParticipant(call.callerSid);
@@ -89,35 +76,5 @@ export class RejectCallHandler extends BaseHandler {
     logger.info(
       `Call rejected: ${caller.identity} <- ${participant.identity} (callId: ${callId}, reason: ${reason || 'No reason provided'})`
     );
-  }
-
-  /**
-   * Get call by ID
-   */
-  private getCallById(room: any, callId: string): RoomCallInfo | null {
-    const calls = this.getCallsFromRoom(room);
-    return calls.find((call) => call.callId === callId) || null;
-  }
-
-  /**
-   * Get all calls from room
-   */
-  private getCallsFromRoom(room: any): RoomCallInfo[] {
-    return (room.metadata?.calls as RoomCallInfo[]) || [];
-  }
-
-  /**
-   * Update call state in room metadata
-   */
-  private updateCallStateInRoom(room: any, callId: string, state: CallState): void {
-    const calls = this.getCallsFromRoom(room);
-    const call = calls.find((c) => c.callId === callId);
-    if (call) {
-      call.state = state;
-      if (state === CallState.Ended || state === CallState.Rejected) {
-        call.endTime = Date.now();
-      }
-      room.metadata = { ...room.metadata, calls };
-    }
   }
 }

@@ -30,6 +30,7 @@ export class Room {
   private router: Router;
   private participants: Map<string, Participant>;
   private active: boolean;
+  private calls: Map<string, RoomCallInfo>;
 
   constructor(router: Router, _worker: MediasoupWorker, options: RoomOptions) {
     this.sid = uuidv4();
@@ -39,6 +40,7 @@ export class Room {
     this.creationTime = Date.now();
     this.router = router;
     this.participants = new Map();
+    this.calls = new Map();
     this.active = true;
   }
 
@@ -184,4 +186,66 @@ export class Room {
     // Close router
     await this.router.close();
   }
+
+  /**
+   * Get all calls in the room
+   */
+  public getCalls(): RoomCallInfo[] {
+    return Array.from(this.calls.values());
+  }
+
+  /**
+   * Get a call by ID
+   */
+  public getCall(callId: string): RoomCallInfo | undefined {
+    return this.calls.get(callId);
+  }
+
+  /**
+   * Add a call to the room
+   */
+  public addCall(callInfo: RoomCallInfo): void {
+    this.calls.set(callInfo.callId, callInfo);
+  }
+
+  /**
+   * Update a call in the room
+   */
+  public updateCall(callId: string, updates: Partial<RoomCallInfo>): void {
+    const call = this.calls.get(callId);
+    if (call) {
+      this.calls.set(callId, { ...call, ...updates });
+    }
+  }
+
+  /**
+   * Remove a call from the room
+   */
+  public removeCall(callId: string): void {
+    this.calls.delete(callId);
+  }
+
+  /**
+   * Get call between two participants
+   */
+  public getCallBetweenParticipants(sid1: string, sid2: string): RoomCallInfo | undefined {
+    return Array.from(this.calls.values()).find(
+      (call) =>
+        (call.callerSid === sid1 && call.targetSid === sid2) ||
+        (call.callerSid === sid2 && call.targetSid === sid1)
+    );
+  }
+}
+
+/**
+ * Call info stored in room
+ */
+export interface RoomCallInfo {
+  callId: string;
+  callerSid: string;
+  targetSid: string;
+  state: 'pending' | 'accepted' | 'rejected' | 'ended';
+  startTime: number;
+  endTime?: number;
+  metadata?: Record<string, unknown>;
 }

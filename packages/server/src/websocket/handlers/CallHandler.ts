@@ -6,23 +6,12 @@ import { CLIENT_EVENTS, ErrorCode, CallState } from '@bytepulse/pulsewave-shared
 import { BaseHandler } from './BaseHandler';
 import type { HandlerContext } from './types';
 import type { CallMessage } from '@bytepulse/pulsewave-shared';
+import type { Room } from '../../sfu/Room';
+import type { RoomCallInfo } from '../../sfu/Room';
 import { v4 as uuidv4 } from 'uuid';
 import { createModuleLogger } from '../../utils/logger';
 
 const logger = createModuleLogger('handler:call');
-
-/**
- * Call info stored in room
- */
-interface RoomCallInfo {
-  callId: string;
-  callerSid: string;
-  targetSid: string;
-  state: CallState;
-  startTime: number;
-  endTime?: number;
-  metadata?: Record<string, unknown>;
-}
 
 export class CallHandler extends BaseHandler {
   public readonly type = CLIENT_EVENTS.CALL;
@@ -72,19 +61,19 @@ export class CallHandler extends BaseHandler {
       callId,
       callerSid: caller.sid,
       targetSid: target.sid,
-      state: CallState.Pending,
+      state: 'pending',
       startTime: Date.now(),
       metadata,
     };
 
-    // Store call in room metadata
-    this.storeCallInRoom(room, callInfo);
+    // Store call in room
+    room.addCall(callInfo);
 
     // Get target's WebSocket connection
     const targetWs = context.connections.get(target.socketId);
     if (!targetWs) {
       this.sendError(context.ws, ErrorCode.ParticipantNotFound, 'Target participant not connected');
-      this.removeCallFromRoom(room, callId);
+      room.removeCall(callId);
       return;
     }
 
@@ -102,39 +91,11 @@ export class CallHandler extends BaseHandler {
   /**
    * Get call between two participants
    */
-  private getCallBetweenParticipants(room: any, sid1: string, sid2: string): RoomCallInfo | null {
-    const calls = this.getCallsFromRoom(room);
-    return (
-      calls.find(
-        (call) =>
-          (call.callerSid === sid1 && call.targetSid === sid2) ||
-          (call.callerSid === sid2 && call.targetSid === sid1)
-      ) || null
-    );
-  }
-
-  /**
-   * Get all calls from room
-   */
-  private getCallsFromRoom(room: any): RoomCallInfo[] {
-    return (room.metadata?.calls as RoomCallInfo[]) || [];
-  }
-
-  /**
-   * Store call in room metadata
-   */
-  private storeCallInRoom(room: any, callInfo: RoomCallInfo): void {
-    const calls = this.getCallsFromRoom(room);
-    calls.push(callInfo);
-    room.metadata = { ...room.metadata, calls };
-  }
-
-  /**
-   * Remove call from room metadata
-   */
-  private removeCallFromRoom(room: any, callId: string): void {
-    const calls = this.getCallsFromRoom(room);
-    const filteredCalls = calls.filter((call) => call.callId !== callId);
-    room.metadata = { ...room.metadata, calls: filteredCalls };
+  private getCallBetweenParticipants(
+    room: Room,
+    sid1: string,
+    sid2: string
+  ): RoomCallInfo | undefined {
+    return room.getCallBetweenParticipants(sid1, sid2);
   }
 }

@@ -5,7 +5,8 @@
 import { BaseHandler } from './BaseHandler';
 import type { HandlerContext } from './types';
 import type { CallAcceptedMessage } from '@bytepulse/pulsewave-shared';
-import type { CallInfo, Participant } from '../../types';
+import type { CallInfo } from '../../types';
+import { RemoteParticipantImpl } from '../Participant';
 import { createModuleLogger } from '../../utils/logger';
 
 const logger = createModuleLogger('handler:call-accepted');
@@ -17,27 +18,20 @@ export class CallAcceptedHandler extends BaseHandler {
     const { callId, participant, metadata } = message;
 
     // Get or create participant from store
-    let targetParticipant: Participant | null = context.client.getParticipant(participant.sid);
+    let targetParticipant = context.client.getParticipant(participant.sid);
 
     if (!targetParticipant) {
       // Create a new participant entry for the target
-      targetParticipant = {
+      const newParticipant = new RemoteParticipantImpl({
         sid: participant.sid,
         identity: participant.identity,
         name: participant.name || participant.identity,
         state: participant.state,
         metadata: participant.metadata || {},
-        isLocal: false,
-        tracks: new Map(),
-        getTracks: () => [],
-        getTrack: () => undefined,
-        getTrackByName: () => undefined,
-        setMetadata: async () => {},
-        on: () => {},
-        off: () => {},
-        removeAllListeners: () => {},
-      };
-      context.client.addParticipant(targetParticipant as any);
+        tracks: [],
+      });
+      context.client.addParticipant(newParticipant);
+      targetParticipant = newParticipant;
     }
 
     // Create call info
@@ -45,7 +39,7 @@ export class CallAcceptedHandler extends BaseHandler {
       callId,
       callerSid: context.client.getLocalParticipant()?.sid || '',
       targetSid: participant.sid,
-      participant: targetParticipant,
+      participant: targetParticipant || undefined,
       metadata,
       state: 'accepted',
       startTime: Date.now(),
