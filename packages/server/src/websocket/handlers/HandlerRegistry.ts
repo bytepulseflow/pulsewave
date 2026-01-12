@@ -21,6 +21,9 @@ import { MuteHandler } from './MuteHandler';
 import { DataHandler } from './DataHandler';
 import { CreateDataProducerHandler } from './CreateDataProducerHandler';
 import { CloseDataProducerHandler } from './CloseDataProducerHandler';
+import { CallHandler } from './CallHandler';
+import { AcceptCallHandler } from './AcceptCallHandler';
+import { RejectCallHandler } from './RejectCallHandler';
 
 const logger = createModuleLogger('handler-registry');
 
@@ -48,6 +51,9 @@ export class HandlerRegistry {
     this.register(new DataHandler());
     this.register(new CreateDataProducerHandler());
     this.register(new CloseDataProducerHandler());
+    this.register(new CallHandler());
+    this.register(new AcceptCallHandler());
+    this.register(new RejectCallHandler());
   }
 
   /**

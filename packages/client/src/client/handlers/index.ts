@@ -26,6 +26,9 @@ export { DataHandler } from './DataHandler';
 export { DataConsumerCreatedHandler } from './DataConsumerCreatedHandler';
 export { DataConsumerClosedHandler } from './DataConsumerClosedHandler';
 export { DataProducerCreatedHandler } from './DataProducerCreatedHandler';
+export { CallReceivedHandler } from './CallReceivedHandler';
+export { CallAcceptedHandler } from './CallAcceptedHandler';
+export { CallRejectedHandler } from './CallRejectedHandler';
 export { ErrorHandler } from './ErrorHandler';
 
 // Handler registry

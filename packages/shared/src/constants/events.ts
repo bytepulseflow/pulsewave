@@ -15,6 +15,9 @@ export const CLIENT_EVENTS = {
   RESUME_CONSUMER: 'resume_consumer',
   MUTE: 'mute',
   DATA: 'data',
+  CALL: 'call',
+  ACCEPT_CALL: 'accept_call',
+  REJECT_CALL: 'reject_call',
 } as const;
 
 // Server -> Client events
@@ -29,6 +32,10 @@ export const SERVER_EVENTS = {
   TRACK_MUTED: 'track_muted',
   DATA: 'data',
   ERROR: 'error',
+  CALL_RECEIVED: 'call_received',
+  CALL_ACCEPTED: 'call_accepted',
+  CALL_REJECTED: 'call_rejected',
+  CALL_ENDED: 'call_ended',
 } as const;
 
 // Room events (for internal use)

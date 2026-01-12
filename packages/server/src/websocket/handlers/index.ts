@@ -24,6 +24,9 @@ export { MuteHandler } from './MuteHandler';
 export { DataHandler } from './DataHandler';
 export { CreateDataProducerHandler } from './CreateDataProducerHandler';
 export { CloseDataProducerHandler } from './CloseDataProducerHandler';
+export { CallHandler } from './CallHandler';
+export { AcceptCallHandler } from './AcceptCallHandler';
+export { RejectCallHandler } from './RejectCallHandler';
 
 // Handler registry
 export { HandlerRegistry, handlerRegistry } from './HandlerRegistry';

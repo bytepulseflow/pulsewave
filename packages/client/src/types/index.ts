@@ -294,6 +294,76 @@ export interface RoomEvents {
    * Server message received (for WebRTC signaling)
    */
   message: (data: unknown) => void;
+
+  /**
+   * Call received (incoming call)
+   */
+  'call-received': (call: CallInfo) => void;
+
+  /**
+   * Call accepted
+   */
+  'call-accepted': (call: CallInfo) => void;
+
+  /**
+   * Call rejected
+   */
+  'call-rejected': (call: CallInfo, reason?: string) => void;
+
+  /**
+   * Call ended
+   */
+  'call-ended': (call: CallInfo, reason?: string) => void;
+}
+
+/**
+ * Call info
+ */
+export interface CallInfo {
+  /**
+   * Unique call ID
+   */
+  callId: string;
+
+  /**
+   * Caller participant SID
+   */
+  callerSid: string;
+
+  /**
+   * Target participant SID
+   */
+  targetSid: string;
+
+  /**
+   * Caller participant info (for incoming calls)
+   */
+  caller?: Participant;
+
+  /**
+   * Target participant info (for accepted/rejected calls)
+   */
+  participant?: Participant;
+
+  /**
+   * Call metadata
+   */
+  metadata?: Record<string, unknown>;
+
+  /**
+   * Call state
+   */
+  state: 'pending' | 'accepted' | 'rejected' | 'ended';
+
+  /**
+   * Call start time
+   */
+  startTime: number;
+
+  /**
+   * Call end time (if ended)
+   */
+  endTime?: number;
 }
 
 /**

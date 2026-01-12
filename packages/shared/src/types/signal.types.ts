@@ -265,6 +265,72 @@ export interface TrackUnmutedMessage {
 }
 
 /**
+ * Call message
+ */
+export interface CallMessage {
+  type: 'call';
+  targetParticipantSid: string;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Accept call message
+ */
+export interface AcceptCallMessage {
+  type: 'accept_call';
+  callId: string;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Reject call message
+ */
+export interface RejectCallMessage {
+  type: 'reject_call';
+  callId: string;
+  reason?: string;
+}
+
+/**
+ * Call received message (incoming call notification)
+ */
+export interface CallReceivedMessage {
+  type: 'call_received';
+  callId: string;
+  caller: ParticipantInfo;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Call accepted message
+ */
+export interface CallAcceptedMessage {
+  type: 'call_accepted';
+  callId: string;
+  participant: ParticipantInfo;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Call rejected message
+ */
+export interface CallRejectedMessage {
+  type: 'call_rejected';
+  callId: string;
+  participant: ParticipantInfo;
+  reason?: string;
+}
+
+/**
+ * Call ended message
+ */
+export interface CallEndedMessage {
+  type: 'call_ended';
+  callId: string;
+  reason?: string;
+}
+
+/**
  * Client message union
  */
 export type ClientMessage =
@@ -280,7 +346,10 @@ export type ClientMessage =
   | MuteMessage
   | DataMessage
   | CreateDataProducerMessage
-  | CloseDataProducerMessage;
+  | CloseDataProducerMessage
+  | CallMessage
+  | AcceptCallMessage
+  | RejectCallMessage;
 
 // ============================================================================
 // Server -> Client Messages
@@ -450,6 +519,10 @@ export type ServerMessage =
   | DataProducerClosedMessage
   | DataConsumerCreatedMessage
   | DataConsumerClosedMessage
+  | CallReceivedMessage
+  | CallAcceptedMessage
+  | CallRejectedMessage
+  | CallEndedMessage
   | ErrorMessage;
 
 // ============================================================================

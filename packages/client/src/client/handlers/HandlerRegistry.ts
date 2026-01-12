@@ -22,6 +22,9 @@ import { DataHandler } from './DataHandler';
 import { DataConsumerCreatedHandler } from './DataConsumerCreatedHandler';
 import { DataConsumerClosedHandler } from './DataConsumerClosedHandler';
 import { DataProducerCreatedHandler } from './DataProducerCreatedHandler';
+import { CallReceivedHandler } from './CallReceivedHandler';
+import { CallAcceptedHandler } from './CallAcceptedHandler';
+import { CallRejectedHandler } from './CallRejectedHandler';
 import { ErrorHandler } from './ErrorHandler';
 import { createModuleLogger } from '../../utils/logger';
 
@@ -53,6 +56,9 @@ export class HandlerRegistry {
     this.register(new DataConsumerCreatedHandler());
     this.register(new DataConsumerClosedHandler());
     this.register(new DataProducerCreatedHandler());
+    this.register(new CallReceivedHandler());
+    this.register(new CallAcceptedHandler());
+    this.register(new CallRejectedHandler());
     this.register(new ErrorHandler());
   }
 

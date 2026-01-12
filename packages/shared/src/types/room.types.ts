@@ -108,6 +108,29 @@ export interface DataPacket {
 }
 
 /**
+ * Call state
+ */
+export enum CallState {
+  Pending = 'pending',
+  Accepted = 'accepted',
+  Rejected = 'rejected',
+  Ended = 'ended',
+}
+
+/**
+ * Call info
+ */
+export interface CallInfo {
+  callId: string;
+  callerSid: string;
+  targetSid: string;
+  state: CallState;
+  startTime: number;
+  endTime?: number;
+  metadata?: Record<string, unknown>;
+}
+
+/**
  * Error codes
  */
 export enum ErrorCode {
@@ -133,6 +156,10 @@ export enum ErrorCode {
   MediaError = 500,
   DeviceNotFound = 501,
   PermissionDenied = 502,
+  // Call errors
+  CallNotFound = 600,
+  CallAlreadyExists = 601,
+  InvalidCallState = 602,
 }
 
 /**

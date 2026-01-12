@@ -21,6 +21,9 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.MediaError]: 'Media error',
   [ErrorCode.DeviceNotFound]: 'Media device not found',
   [ErrorCode.PermissionDenied]: 'Permission denied',
+  [ErrorCode.CallNotFound]: 'Call not found',
+  [ErrorCode.CallAlreadyExists]: 'Call already exists',
+  [ErrorCode.InvalidCallState]: 'Invalid call state',
 };
 
 /**

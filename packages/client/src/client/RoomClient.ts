@@ -483,6 +483,48 @@ export class RoomClient {
   }
 
   /**
+   * Call a participant
+   * @param targetParticipantSid - The SID of the participant to call
+   * @param metadata - Optional metadata to send with the call
+   */
+  async call(targetParticipantSid: string, metadata?: Record<string, unknown>): Promise<void> {
+    this.send({
+      type: 'call',
+      targetParticipantSid,
+      metadata,
+    });
+    logger.info(`Calling participant: ${targetParticipantSid}`);
+  }
+
+  /**
+   * Accept an incoming call
+   * @param callId - The ID of the call to accept
+   * @param metadata - Optional metadata to send with the acceptance
+   */
+  async acceptCall(callId: string, metadata?: Record<string, unknown>): Promise<void> {
+    this.send({
+      type: 'accept_call',
+      callId,
+      metadata,
+    });
+    logger.info(`Accepting call: ${callId}`);
+  }
+
+  /**
+   * Reject an incoming call
+   * @param callId - The ID of the call to reject
+   * @param reason - Optional reason for rejection
+   */
+  async rejectCall(callId: string, reason?: string): Promise<void> {
+    this.send({
+      type: 'reject_call',
+      callId,
+      reason,
+    });
+    logger.info(`Rejecting call: ${callId}${reason ? `, reason: ${reason}` : ''}`);
+  }
+
+  /**
    * Add event listener
    */
   on<K extends keyof RoomEvents>(event: K, listener: RoomEvents[K]): void {
