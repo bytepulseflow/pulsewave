@@ -46,7 +46,7 @@ export type StateChangeListener = (state: SignalingClientState) => void;
 /**
  * Event listener for incoming messages
  */
-export type MessageListener = (message: Record<string, unknown>) => void;
+export type MessageListener<T = Record<string, unknown>> = (message: T) => void;
 
 /**
  * Event listener for errors
@@ -56,9 +56,12 @@ export type ErrorListener = (error: Error) => void;
 /**
  * SignalingClient - Generic signaling client for intent-based communication
  */
-export class SignalingClient {
+export class SignalingClient<
+  OutgoingMessage = Record<string, unknown>,
+  IncomingMessage = Record<string, unknown>,
+> {
   private transport: SignalingTransport;
-  private messageListeners: Set<MessageListener> = new Set();
+  private messageListeners: Set<MessageListener<IncomingMessage>> = new Set();
   private stateListeners: Set<StateChangeListener> = new Set();
   private errorListeners: Set<ErrorListener> = new Set();
   private _state: SignalingClientState = 'disconnected';
@@ -105,9 +108,9 @@ export class SignalingClient {
   /**
    * Send a message to the signaling server
    */
-  send(message: Record<string, unknown>): void {
-    logger.debug('Sending message:', { type: message.type });
-    this.transport.send(message);
+  send(message: OutgoingMessage): void {
+    logger.debug('Sending message:', { type: (message as Record<string, unknown>).type });
+    this.transport.send(message as Record<string, unknown>);
   }
 
   /**
@@ -127,14 +130,14 @@ export class SignalingClient {
   /**
    * Register a listener for incoming messages
    */
-  onMessage(listener: MessageListener): void {
+  onMessage(listener: MessageListener<IncomingMessage>): void {
     this.messageListeners.add(listener);
   }
 
   /**
    * Unregister a message listener
    */
-  offMessage(listener: MessageListener): void {
+  offMessage(listener: MessageListener<IncomingMessage>): void {
     this.messageListeners.delete(listener);
   }
 
@@ -175,7 +178,7 @@ export class SignalingClient {
    */
   private handleTransportMessage(message: Record<string, unknown>): void {
     logger.debug('Message received:', { type: message.type });
-    this.notifyMessageListeners(message);
+    this.notifyMessageListeners(message as IncomingMessage);
   }
 
   /**
@@ -202,7 +205,7 @@ export class SignalingClient {
   /**
    * Notify all message listeners
    */
-  private notifyMessageListeners(message: Record<string, unknown>): void {
+  private notifyMessageListeners(message: IncomingMessage): void {
     this.messageListeners.forEach((listener) => {
       try {
         listener(message);

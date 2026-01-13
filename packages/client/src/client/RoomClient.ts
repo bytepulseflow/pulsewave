@@ -10,10 +10,17 @@
 
 import type { SignalingClient, SignalingClientOptions } from '../signaling/SignalingClient';
 import { SignalingClient as SignalingClientImpl } from '../signaling/SignalingClient';
-import type { RoomInfo, ParticipantInfo, TrackInfo } from '@bytepulse/pulsewave-shared';
+import type {
+  RoomInfo,
+  ParticipantInfo,
+  TrackInfo,
+  ClientIntent,
+  ServerResponse,
+} from '@bytepulse/pulsewave-shared';
 import { RoomService } from '../services/RoomService';
 import { CallService } from '../services/CallService';
 import { createModuleLogger } from '../utils/logger';
+import { EventEmitter } from '../utils';
 
 const logger = createModuleLogger('room-client');
 
@@ -145,18 +152,15 @@ export interface RoomClientEvents {
   error: (error: Error) => void;
 }
 
-export class RoomClient {
-  private signalingClient: SignalingClient;
+export class RoomClient extends EventEmitter<RoomClientEvents> {
+  private signalingClient: SignalingClient<ClientIntent, ServerResponse>;
   private roomService: RoomService;
   private callService: CallService;
-  private eventListeners: Map<
-    keyof RoomClientEvents,
-    Set<RoomClientEvents[keyof RoomClientEvents]>
-  > = new Map();
 
   constructor(private readonly options: RoomClientOptions) {
+    super({ name: 'RoomClient' });
     // Initialize signaling client
-    this.signalingClient = new SignalingClientImpl({
+    this.signalingClient = new SignalingClientImpl<ClientIntent, ServerResponse>({
       transport: options.signaling.transport,
       transportImpl: options.signaling.transportImpl,
     });
@@ -329,36 +333,8 @@ export class RoomClient {
     return this.roomService.getOrCreateMediaEngineAdapter().catch(() => null);
   }
 
-  getSignalingClient(): SignalingClient {
+  getSignalingClient(): SignalingClient<ClientIntent, ServerResponse> {
     return this.signalingClient;
-  }
-
-  /**
-   * Add event listener
-   */
-  on<K extends keyof RoomClientEvents>(event: K, listener: RoomClientEvents[K]): void {
-    if (!this.eventListeners.has(event)) {
-      this.eventListeners.set(event, new Set());
-    }
-    (this.eventListeners.get(event) as Set<(data: unknown) => void>).add(
-      listener as (data: unknown) => void
-    );
-  }
-
-  /**
-   * Remove event listener
-   */
-  off<K extends keyof RoomClientEvents>(event: K, listener: RoomClientEvents[K]): void {
-    (this.eventListeners.get(event) as Set<(data: unknown) => void>)?.delete(
-      listener as (data: unknown) => void
-    );
-  }
-
-  /**
-   * Remove all event listeners
-   */
-  removeAllListeners(): void {
-    this.eventListeners.clear();
   }
 
   /**
@@ -405,22 +381,6 @@ export class RoomClient {
 
     this.callService.on('error', (error) => {
       this.emit('error', error);
-    });
-  }
-
-  /**
-   * Emit event
-   */
-  private emit<K extends keyof RoomClientEvents>(
-    event: K,
-    data: Parameters<RoomClientEvents[K]>[0]
-  ): void {
-    (this.eventListeners.get(event) as Set<(data: unknown) => void>)?.forEach((listener) => {
-      try {
-        listener(data);
-      } catch (error) {
-        logger.error('Error in event listener:', { event, error });
-      }
     });
   }
 }

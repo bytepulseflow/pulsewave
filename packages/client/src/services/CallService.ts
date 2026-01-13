@@ -7,7 +7,7 @@
 
 import type { RoomService } from './RoomService';
 import type { ServerResponse, ParticipantInfo } from '@bytepulse/pulsewave-shared';
-import { createModuleLogger } from '../utils/logger';
+import { createModuleLogger, EventEmitter } from '../utils';
 
 const logger = createModuleLogger('call-service');
 
@@ -62,14 +62,11 @@ export interface CallServiceOptions {
 /**
  * CallService - Orchestrates call-level operations
  */
-export class CallService {
+export class CallService extends EventEmitter<CallServiceEvents> {
   private activeCallId: string | null = null;
-  private eventListeners: Map<
-    keyof CallServiceEvents,
-    Set<CallServiceEvents[keyof CallServiceEvents]>
-  > = new Map();
 
   constructor(private readonly options: CallServiceOptions) {
+    super({ name: 'CallService' });
     this.setupRoomServiceListeners();
   }
 
@@ -159,34 +156,6 @@ export class CallService {
   }
 
   /**
-   * Add event listener
-   */
-  on<K extends keyof CallServiceEvents>(event: K, listener: CallServiceEvents[K]): void {
-    if (!this.eventListeners.has(event)) {
-      this.eventListeners.set(event, new Set());
-    }
-    (this.eventListeners.get(event) as Set<(data: unknown) => void>).add(
-      listener as (data: unknown) => void
-    );
-  }
-
-  /**
-   * Remove event listener
-   */
-  off<K extends keyof CallServiceEvents>(event: K, listener: CallServiceEvents[K]): void {
-    (this.eventListeners.get(event) as Set<(data: unknown) => void>)?.delete(
-      listener as (data: unknown) => void
-    );
-  }
-
-  /**
-   * Remove all event listeners
-   */
-  removeAllListeners(): void {
-    this.eventListeners.clear();
-  }
-
-  /**
    * Setup room service listeners
    */
   private setupRoomServiceListeners(): void {
@@ -272,22 +241,6 @@ export class CallService {
     this.emit('call-ended', {
       callId: message.callId,
       reason: message.reason,
-    });
-  }
-
-  /**
-   * Emit event
-   */
-  private emit<K extends keyof CallServiceEvents>(
-    event: K,
-    data: Parameters<CallServiceEvents[K]>[0]
-  ): void {
-    (this.eventListeners.get(event) as Set<(data: unknown) => void>)?.forEach((listener) => {
-      try {
-        listener(data);
-      } catch (error) {
-        logger.error('Error in event listener:', { event, error });
-      }
     });
   }
 }

@@ -16,7 +16,7 @@ import type {
 } from '@bytepulse/pulsewave-shared';
 import type { LocalParticipantImpl } from '../domain/LocalParticipant';
 import type { RemoteParticipantImpl } from '../domain/Participant';
-import { createModuleLogger } from '../utils/logger';
+import { createModuleLogger, EventEmitter } from '../utils';
 
 const logger = createModuleLogger('room-service');
 
@@ -63,7 +63,7 @@ export interface RoomServiceOptions {
   /**
    * Signaling client
    */
-  signalingClient: SignalingClient;
+  signalingClient: SignalingClient<ClientIntent, ServerResponse>;
 
   /**
    * Media engine adapter factory
@@ -74,19 +74,16 @@ export interface RoomServiceOptions {
 /**
  * RoomService - Orchestrates room-level operations
  */
-export class RoomService {
+export class RoomService extends EventEmitter<RoomServiceEvents> {
   private roomInfo: RoomInfo | null = null;
   private localParticipant: ParticipantInfo | null = null;
   private participants: Map<string, ParticipantInfo> = new Map();
   private mediaEngineAdapter: MediaEngineAdapter | null = null;
   private localParticipantImpl: LocalParticipantImpl | null = null;
   private remoteParticipants: Map<string, RemoteParticipantImpl> = new Map();
-  private eventListeners: Map<
-    keyof RoomServiceEvents,
-    Set<RoomServiceEvents[keyof RoomServiceEvents]>
-  > = new Map();
 
   constructor(private readonly options: RoomServiceOptions) {
+    super({ name: 'RoomService' });
     this.setupSignalingListeners();
   }
 
@@ -210,34 +207,6 @@ export class RoomService {
   }
 
   /**
-   * Add event listener
-   */
-  on<K extends keyof RoomServiceEvents>(event: K, listener: RoomServiceEvents[K]): void {
-    if (!this.eventListeners.has(event)) {
-      this.eventListeners.set(event, new Set());
-    }
-    (this.eventListeners.get(event) as Set<(data: unknown) => void>).add(
-      listener as (data: unknown) => void
-    );
-  }
-
-  /**
-   * Remove event listener
-   */
-  off<K extends keyof RoomServiceEvents>(event: K, listener: RoomServiceEvents[K]): void {
-    (this.eventListeners.get(event) as Set<(data: unknown) => void>)?.delete(
-      listener as (data: unknown) => void
-    );
-  }
-
-  /**
-   * Remove all event listeners
-   */
-  removeAllListeners(): void {
-    this.eventListeners.clear();
-  }
-
-  /**
    * Setup signaling client listeners
    */
   private setupSignalingListeners(): void {
@@ -252,7 +221,7 @@ export class RoomService {
     });
 
     this.options.signalingClient.onMessage((message) => {
-      this.handleServerMessage(message as unknown as ServerResponse);
+      this.handleServerMessage(message);
     });
   }
 
@@ -279,9 +248,34 @@ export class RoomService {
         this.emit('error', new Error(message.error.message));
         break;
 
-      default:
-        // Other message types are handled by other services
+      case 'call_started':
+      case 'call_received':
+      case 'call_accepted':
+      case 'call_rejected':
+      case 'call_ended':
+      case 'camera_enabled':
+      case 'camera_disabled':
+      case 'microphone_enabled':
+      case 'microphone_disabled':
+      case 'data_received':
+      case 'track_published':
+      case 'track_unpublished':
+      case 'track_subscribed':
+      case 'track_unsubscribed':
+      case 'track_muted':
+      case 'track_unmuted':
+        // These message types are handled by other services (CallService, TrackService, etc.)
+        logger.debug('Message handled by another service:', { type: message.type });
         break;
+
+      default: {
+        // Type guard to ensure we've covered all cases
+        const unhandled: never = message;
+        logger.warn('Unhandled server message type:', {
+          type: (unhandled as { type: string }).type,
+        });
+        break;
+      }
     }
   }
 
@@ -333,22 +327,6 @@ export class RoomService {
    * Send intent to server
    */
   sendIntent(intent: ClientIntent): void {
-    this.options.signalingClient.send(intent as unknown as Record<string, unknown>);
-  }
-
-  /**
-   * Emit event
-   */
-  private emit<K extends keyof RoomServiceEvents>(
-    event: K,
-    data: Parameters<RoomServiceEvents[K]>[0]
-  ): void {
-    (this.eventListeners.get(event) as Set<(data: unknown) => void>)?.forEach((listener) => {
-      try {
-        listener(data);
-      } catch (error) {
-        logger.error('Error in event listener:', { event, error });
-      }
-    });
+    this.options.signalingClient.send(intent);
   }
 }
