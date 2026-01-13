@@ -1,15 +1,19 @@
 /**
  * Mediasoup Server - Main entry point
+ *
+ * New Architecture:
+ * - Application Layer: Business logic (RoomManager, CallManager)
+ * - Adapter Layer: Mediasoup operations (MediasoupAdapter, AdapterManager)
+ * - Handlers: Intent-based WebSocket message handling
  */
 
 import http from 'http';
 import express, { Application, Request, Response, NextFunction } from 'express';
 import { getConfig } from './config';
-import { createWorker, MediasoupWorker } from './sfu';
-import { RoomManager } from './sfu';
-import { WebSocketServer } from './websocket';
+import { createWorker, MediasoupWorker } from './adapter';
+import { WebSocketServer, routes } from './transport';
+import { AdapterManager } from './adapter';
 import { RedisManager } from './redis';
-import { routes } from './api';
 import { createModuleLogger } from './utils/logger';
 
 const logger = createModuleLogger('server');
@@ -27,7 +31,6 @@ class MediasoupServer {
   private app: Application;
   private httpServer: http.Server;
   private workers: MediasoupWorker[];
-  private roomManager!: RoomManager;
   private redisManager: RedisManager | null;
   private wsServer!: WebSocketServer;
   private config = getConfig();
@@ -74,7 +77,7 @@ class MediasoupServer {
     this.app.get('/', (_req: Request<unknown, ServerInfo>, res: Response<ServerInfo>) => {
       res.json({
         name: 'Pulsewave Server',
-        version: '0.1.0',
+        version: '0.2.0',
         status: 'running',
       });
     });
@@ -100,13 +103,21 @@ class MediasoupServer {
       logger.info(`Worker ${i + 1} created`);
     }
 
-    this.roomManager = new RoomManager(this.workers);
+    // Create AdapterManager to manage MediasoupAdapter instances per room
+    const adapterManager = new AdapterManager(this.workers, {
+      enableUdp: this.config.mediasoup.enableUdp,
+      enableTcp: this.config.mediasoup.enableTcp,
+      preferUdp: this.config.mediasoup.preferUdp,
+      enableSctp: this.config.mediasoup.enableSctp,
+      listenIps: this.config.mediasoup.listenIps,
+      initialAvailableOutgoingBitrate: this.config.mediasoup.initialAvailableOutgoingBitrate,
+    });
 
     this.wsServer = new WebSocketServer(
       this.httpServer,
-      this.roomManager,
       this.redisManager,
-      this.config.jwt
+      this.config.jwt,
+      adapterManager
     );
     logger.info('WebSocket server initialized');
   }
@@ -133,7 +144,8 @@ class MediasoupServer {
 
     this.wsServer.close();
 
-    await this.roomManager.closeAllRooms();
+    // Close all adapters
+    // Note: AdapterManager is managed by WebSocketServer
 
     for (const worker of this.workers) {
       await worker.close();

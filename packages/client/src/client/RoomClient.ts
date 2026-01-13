@@ -1,387 +1,457 @@
 /**
  * RoomClient - Main client class for connecting to a mediasoup room
  *
+ * This is the new RoomClient implementation that uses:
+ * - Signaling Layer: Generic signaling with pluggable backends
+ * - Adapter Layer: Translates signaling to mediasoup operations
+ * - Session State Machine: Manages session states and reconnection
  *
- * Acts as a facade/coordinator, delegating to specialized controllers.
+ * This client is stateful and imperative (not React-aware).
  */
 
-import type { RoomInfo, RtpCapabilities, DataProvider } from '@bytepulse/pulsewave-shared';
-import {
-  ConnectionState,
-  DataProviderType as SharedDataProviderType,
-  DataChannelKind,
-} from '@bytepulse/pulsewave-shared';
+import type { SignalingClient, SignalingClientOptions } from '../signaling/SignalingClient';
+import { SignalingClient as SignalingClientImpl } from '../signaling/SignalingClient';
+import type { MediasoupAdapter } from '../adapter/MediasoupAdapter';
+import { MediasoupAdapter as MediasoupAdapterImpl } from '../adapter/MediasoupAdapter';
+import type { RtpCapabilities } from '@bytepulse/pulsewave-shared';
 import type {
-  RoomClientOptions,
-  RoomEvents,
-  LocalParticipant,
-  RemoteParticipant,
-  RemoteTrack,
-  RemoteTrackPublication,
-  TrackSubscribeOptions,
-} from '../types';
-import { LocalParticipantImpl } from './LocalParticipant';
-import { RemoteParticipantImpl } from './Participant';
-import { LocalTrack as LocalTrackImpl } from './LocalTrack';
-import {
-  EventBus,
-  ParticipantStore,
-  ConnectionController,
-  SignalingClient,
-  MediaController,
-  WebRTCController,
-  TrackController,
-} from './controllers';
-import { WebSocketDataProvider, WebRTCDataProvider } from '../data/providers';
+  ClientIntent,
+  ServerResponse,
+  RoomInfo,
+  ParticipantInfo,
+  TrackInfo,
+} from '@bytepulse/pulsewave-shared';
 import { createModuleLogger } from '../utils/logger';
 
 const logger = createModuleLogger('room-client');
 
+/**
+ * Room client options
+ */
+export interface RoomClientOptions {
+  /**
+   * Signaling client options
+   */
+  signaling: SignalingClientOptions;
+
+  /**
+   * Room name
+   */
+  room: string;
+
+  /**
+   * Authentication token
+   */
+  token: string;
+
+  /**
+   * Metadata
+   */
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Room events
+ */
+export interface RoomEvents {
+  /**
+   * Connection state changed
+   */
+  'connection-state-changed': (
+    state: 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error'
+  ) => void;
+
+  /**
+   * Room joined (presence-only)
+   */
+  'room-joined': (data: {
+    room: RoomInfo;
+    participant: ParticipantInfo;
+    otherParticipants: ParticipantInfo[];
+  }) => void;
+
+  /**
+   * Participant joined
+   */
+  'participant-joined': (participant: ParticipantInfo) => void;
+
+  /**
+   * Participant left
+   */
+  'participant-left': (participantSid: string) => void;
+
+  /**
+   * Call received
+   */
+  'call-received': (data: {
+    callId: string;
+    caller: ParticipantInfo;
+    metadata?: Record<string, unknown>;
+  }) => void;
+
+  /**
+   * Call accepted
+   */
+  'call-accepted': (data: { callId: string; participant: ParticipantInfo }) => void;
+
+  /**
+   * Call rejected
+   */
+  'call-rejected': (data: {
+    callId: string;
+    participant: ParticipantInfo;
+    reason?: string;
+  }) => void;
+
+  /**
+   * Call ended
+   */
+  'call-ended': (data: { callId: string; reason?: string }) => void;
+
+  /**
+   * Track published
+   */
+  'track-published': (data: { participantSid: string; track: TrackInfo }) => void;
+
+  /**
+   * Track unpublished
+   */
+  'track-unpublished': (data: { participantSid: string; trackSid: string }) => void;
+
+  /**
+   * Track subscribed
+   */
+  'track-subscribed': (data: { participantSid: string; track: TrackInfo }) => void;
+
+  /**
+   * Track unsubscribed
+   */
+  'track-unsubscribed': (data: { participantSid: string; trackSid: string }) => void;
+
+  /**
+   * Track muted
+   */
+  'track-muted': (data: { participantSid: string; trackSid: string }) => void;
+
+  /**
+   * Track unmuted
+   */
+  'track-unmuted': (data: { participantSid: string; trackSid: string }) => void;
+
+  /**
+   * Data received
+   */
+  'data-received': (data: {
+    participantSid: string;
+    payload: unknown;
+    kind?: 'reliable' | 'lossy';
+  }) => void;
+
+  /**
+   * Error
+   */
+  error: (error: Error) => void;
+}
+
+/**
+ * RoomClient - Main RoomClient using the layered architecture
+ */
 export class RoomClient {
-  public readonly options: RoomClientOptions;
-
-  // Controllers
-  private eventBus: EventBus;
-  private participantStore: ParticipantStore;
-  private connectionController: ConnectionController;
   private signalingClient: SignalingClient;
-  private mediaController: MediaController;
-  private webRTCController: WebRTCController;
-  private trackController: TrackController;
+  private mediasoupAdapter: MediasoupAdapter | null = null;
+  private roomInfo: RoomInfo | null = null;
+  private localParticipant: ParticipantInfo | null = null;
+  private participants: Map<string, ParticipantInfo> = new Map();
+  private rtpCapabilities: RtpCapabilities | null = null;
+  private eventListeners: Map<keyof RoomEvents, Set<RoomEvents[keyof RoomEvents]>> = new Map();
 
-  // Data provider (strategy pattern for data transmission)
-  private dataProvider: DataProvider | null = null;
+  constructor(private readonly options: RoomClientOptions) {
+    // Initialize signaling client
+    this.signalingClient = new SignalingClientImpl({
+      transport: options.signaling.transport,
+      transportImpl: options.signaling.transportImpl,
+    });
 
-  // Room state
-  public roomInfo: RoomInfo | null = null;
-  public rtpCapabilities: RtpCapabilities | null = null;
-
-  constructor(options: RoomClientOptions) {
-    this.options = options;
-
-    // Initialize controllers
-    this.eventBus = new EventBus();
-    this.participantStore = new ParticipantStore();
-    this.connectionController = new ConnectionController(options);
-    this.signalingClient = new SignalingClient(options, (message) =>
-      this.connectionController.send(message)
-    );
-    this.mediaController = new MediaController();
-    this.webRTCController = new WebRTCController((message) =>
-      this.connectionController.send(message)
-    );
-    this.trackController = new TrackController(
-      this.webRTCController,
-      this.participantStore,
-      (event, data) => this.eventBus.emit(event as keyof RoomEvents, data)
-    );
-
-    // Initialize data provider based on configuration
-    this.initializeDataProvider();
-
-    // Setup controller wiring
-    this.setupControllers();
+    // Setup signaling client listeners
+    this.setupSignalingListeners();
   }
 
   /**
-   * Initialize data provider based on configuration
-   */
-  private initializeDataProvider(): void {
-    const dataProviderConfig = this.options.dataProvider;
-
-    if (!dataProviderConfig) {
-      // Default to WebSocket provider
-      this.dataProvider = new WebSocketDataProvider(async (data, kind) =>
-        this.signalingClient.sendData(data, kind)
-      );
-      logger.info('Using WebSocket data provider (default)');
-      return;
-    }
-
-    // Check if it's a DataProviderType enum value
-    if (typeof dataProviderConfig === 'string') {
-      if (dataProviderConfig === SharedDataProviderType.WebSocket) {
-        this.dataProvider = new WebSocketDataProvider(async (data, kind) =>
-          this.signalingClient.sendData(data, kind)
-        );
-        logger.info('Using WebSocket data provider');
-      } else if (dataProviderConfig === SharedDataProviderType.WebRTC) {
-        // WebRTC provider requires WebRTC controller integration
-        this.dataProvider = new WebRTCDataProvider({
-          createDataProducer: async (config) => {
-            // Integrate with WebRTC controller to create data producer
-            await this.ensureWebRTCInitialized();
-            return this.webRTCController.createDataProducer(
-              config.label.includes('lossy') ? DataChannelKind.Lossy : DataChannelKind.Reliable,
-              config
-            );
-          },
-          closeDataProducer: async (producerId) => {
-            // Integrate with WebRTC controller to close data producer
-            return this.webRTCController.closeDataProducer(producerId);
-          },
-          onDataConsumer: (consumer) => {
-            // Handle new data consumer
-            logger.debug('Data consumer created via WebRTC', consumer);
-          },
-          onDataConsumerClosed: (consumerId) => {
-            // Handle data consumer closed
-            logger.debug('Data consumer closed via WebRTC', consumerId);
-          },
-        });
-        logger.info('Using WebRTC data provider (experimental)');
-      }
-    } else {
-      // Full configuration object
-      if (dataProviderConfig.type === SharedDataProviderType.WebSocket) {
-        this.dataProvider = new WebSocketDataProvider(
-          async (data, kind) => this.signalingClient.sendData(data, kind),
-          dataProviderConfig
-        );
-        logger.info('Using WebSocket data provider with custom config');
-      } else if (dataProviderConfig.type === SharedDataProviderType.WebRTC) {
-        this.dataProvider = new WebRTCDataProvider(
-          {
-            createDataProducer: async (config) => {
-              // Integrate with WebRTC controller to create data producer
-              await this.ensureWebRTCInitialized();
-              return this.webRTCController.createDataProducer(
-                config.label.includes('lossy') ? DataChannelKind.Lossy : DataChannelKind.Reliable,
-                config
-              );
-            },
-            closeDataProducer: async (producerId) => {
-              // Integrate with WebRTC controller to close data producer
-              return this.webRTCController.closeDataProducer(producerId);
-            },
-            onDataConsumer: (consumer) => {
-              // Handle new data consumer
-              logger.debug('Data consumer created via WebRTC', consumer);
-            },
-            onDataConsumerClosed: (consumerId) => {
-              // Handle data consumer closed
-              logger.debug('Data consumer closed via WebRTC', consumerId);
-            },
-          },
-          dataProviderConfig
-        );
-        logger.info('Using WebRTC data provider with custom config (experimental)');
-      }
-    }
-  }
-
-  /**
-   * Setup controller wiring
-   */
-  private setupControllers(): void {
-    // Wire connection state changes to event bus
-    this.connectionController.onStateChange((state) => {
-      this.eventBus.emit('connection-state-changed', state);
-    });
-
-    // Wire connection errors to event bus
-    this.connectionController.onError((error) => {
-      this.eventBus.emit('error', error);
-    });
-
-    // Wire incoming messages to signaling client and WebRTC handlers
-    this.connectionController.setMessageListener((message) => {
-      this.eventBus.emit('message', message);
-      this.signalingClient.handleMessage(message as Record<string, unknown>);
-      // Also notify WebRTC message handlers
-      this.webRTCController.getMessageHandlers().forEach((handler) => handler(message));
-    });
-
-    // Set client reference in signaling client for handlers
-    this.signalingClient.setClient(this);
-  }
-
-  /**
-   * Connect to the room
+   * Connect to the room (presence-only, no media)
    */
   async connect(): Promise<void> {
+    logger.info('Connecting to room...');
+
     try {
-      await this.connectionController.connect();
-      this.signalingClient.sendJoin();
+      await this.signalingClient.connect();
 
-      // Initialize data provider (only WebSocket provider can be initialized now)
-      // WebRTC provider will be initialized after WebRTC is ready
-      if (this.dataProvider && this.dataProvider.type === SharedDataProviderType.WebSocket) {
-        await this.dataProvider.initialize();
-        // Wire data provider events to event bus
-        this.dataProvider.on('data-received', (packet, participantSid) => {
-          const participant = this.participantStore.getParticipant(participantSid);
-          if (participant) {
-            this.eventBus.emit('data-received', { data: packet, participant });
-          }
-        });
-        this.dataProvider.on('error', (error) => {
-          this.eventBus.emit('error', error);
-        });
-      }
+      // Send join room intent
+      this.sendIntent({
+        type: 'join_room',
+        room: this.options.room,
+        token: this.options.token,
+        metadata: this.options.metadata,
+      });
 
-      this.eventBus.emit('connection-state-changed', ConnectionState.Connected);
+      logger.info('Join room intent sent');
     } catch (error) {
-      this.eventBus.emit('error', error as Error);
+      logger.error('Failed to connect:', { error });
+      this.emit('error', error as Error);
       throw error;
     }
   }
 
   /**
-   * Initialize WebRTC data provider (called after WebRTC is ready)
+   * Start a call (initiate media session)
    */
-  public async initializeWebRTCDataProvider(): Promise<void> {
-    if (this.dataProvider && this.dataProvider.type === SharedDataProviderType.WebRTC) {
-      await this.dataProvider.initialize();
-      // Wire data provider events to event bus
-      this.dataProvider.on('data-received', (packet, participantSid) => {
-        const participant = this.participantStore.getParticipant(participantSid);
-        if (participant) {
-          this.eventBus.emit('data-received', { data: packet, participant });
-        }
-      });
-      this.dataProvider.on('error', (error) => {
-        this.eventBus.emit('error', error);
-      });
-      logger.info('WebRTC data provider initialized');
+  async startCall(targetParticipantSid: string, metadata?: Record<string, unknown>): Promise<void> {
+    logger.info('Starting call:', { targetParticipantSid });
+
+    // Initialize mediasoup adapter if not already initialized
+    if (!this.mediasoupAdapter) {
+      await this.initializeMediasoupAdapter();
     }
+
+    // Send start call intent
+    this.sendIntent({
+      type: 'start_call',
+      targetParticipantSid,
+      metadata,
+    });
+
+    logger.info('Start call intent sent');
+  }
+
+  /**
+   * Accept an incoming call
+   */
+  async acceptCall(callId: string, metadata?: Record<string, unknown>): Promise<void> {
+    logger.info('Accepting call:', { callId });
+
+    // Initialize mediasoup adapter if not already initialized
+    if (!this.mediasoupAdapter) {
+      await this.initializeMediasoupAdapter();
+    }
+
+    // Send accept call intent
+    this.sendIntent({
+      type: 'accept_call',
+      callId,
+      metadata,
+    });
+
+    logger.info('Accept call intent sent');
+  }
+
+  /**
+   * Reject an incoming call
+   */
+  async rejectCall(callId: string, reason?: string): Promise<void> {
+    logger.info('Rejecting call:', { callId, reason });
+
+    // Send reject call intent
+    this.sendIntent({
+      type: 'reject_call',
+      callId,
+      reason,
+    });
+
+    logger.info('Reject call intent sent');
+  }
+
+  /**
+   * End a call
+   */
+  async endCall(callId: string, reason?: string): Promise<void> {
+    logger.info('Ending call:', { callId, reason });
+
+    // Send end call intent
+    this.sendIntent({
+      type: 'end_call',
+      callId,
+      reason,
+    });
+
+    // Close mediasoup adapter
+    if (this.mediasoupAdapter) {
+      this.mediasoupAdapter.close();
+      this.mediasoupAdapter = null;
+    }
+
+    logger.info('End call intent sent');
+  }
+
+  /**
+   * Enable camera
+   */
+  async enableCamera(deviceId?: string): Promise<void> {
+    logger.info('Enabling camera:', { deviceId });
+
+    // Ensure mediasoup adapter is initialized
+    if (!this.mediasoupAdapter) {
+      await this.initializeMediasoupAdapter();
+    }
+
+    // Send enable camera intent
+    this.sendIntent({
+      type: 'enable_camera',
+      deviceId,
+    });
+
+    logger.info('Enable camera intent sent');
+  }
+
+  /**
+   * Disable camera
+   */
+  async disableCamera(): Promise<void> {
+    logger.info('Disabling camera');
+
+    // Send disable camera intent
+    this.sendIntent({
+      type: 'disable_camera',
+    });
+
+    logger.info('Disable camera intent sent');
+  }
+
+  /**
+   * Enable microphone
+   */
+  async enableMicrophone(deviceId?: string): Promise<void> {
+    logger.info('Enabling microphone:', { deviceId });
+
+    // Ensure mediasoup adapter is initialized
+    if (!this.mediasoupAdapter) {
+      await this.initializeMediasoupAdapter();
+    }
+
+    // Send enable microphone intent
+    this.sendIntent({
+      type: 'enable_microphone',
+      deviceId,
+    });
+
+    logger.info('Enable microphone intent sent');
+  }
+
+  /**
+   * Disable microphone
+   */
+  async disableMicrophone(): Promise<void> {
+    logger.info('Disabling microphone');
+
+    // Send disable microphone intent
+    this.sendIntent({
+      type: 'disable_microphone',
+    });
+
+    logger.info('Disable microphone intent sent');
+  }
+
+  /**
+   * Send data to all participants
+   */
+  async sendData(data: unknown, kind: 'reliable' | 'lossy' = 'reliable'): Promise<void> {
+    logger.debug('Sending data:', { kind });
+
+    // Send send data intent
+    this.sendIntent({
+      type: 'send_data',
+      payload: data,
+      kind,
+    });
+
+    logger.debug('Send data intent sent');
+  }
+
+  /**
+   * Subscribe to participant's tracks
+   */
+  async subscribeToParticipant(participantSid: string): Promise<void> {
+    logger.info('Subscribing to participant:', { participantSid });
+
+    // Send subscribe to participant intent
+    this.sendIntent({
+      type: 'subscribe_to_participant',
+      participantSid,
+    });
+
+    logger.info('Subscribe to participant intent sent');
+  }
+
+  /**
+   * Unsubscribe from participant's tracks
+   */
+  async unsubscribeFromParticipant(participantSid: string): Promise<void> {
+    logger.info('Unsubscribing from participant:', { participantSid });
+
+    // Send unsubscribe from participant intent
+    this.sendIntent({
+      type: 'unsubscribe_from_participant',
+      participantSid,
+    });
+
+    logger.info('Unsubscribe from participant intent sent');
+  }
+
+  /**
+   * Mute track
+   */
+  async muteTrack(trackSid: string): Promise<void> {
+    logger.info('Muting track:', { trackSid });
+
+    // Send mute track intent
+    this.sendIntent({
+      type: 'mute_track',
+      trackSid,
+    });
+
+    logger.info('Mute track intent sent');
+  }
+
+  /**
+   * Unmute track
+   */
+  async unmuteTrack(trackSid: string): Promise<void> {
+    logger.info('Unmuting track:', { trackSid });
+
+    // Send unmute track intent
+    this.sendIntent({
+      type: 'unmute_track',
+      trackSid,
+    });
+
+    logger.info('Unmute track intent sent');
   }
 
   /**
    * Disconnect from the room
    */
   async disconnect(): Promise<void> {
-    // Close data provider
-    if (this.dataProvider) {
-      await this.dataProvider.close();
-      this.dataProvider = null;
+    logger.info('Disconnecting from room...');
+
+    // Close mediasoup adapter
+    if (this.mediasoupAdapter) {
+      this.mediasoupAdapter.close();
+      this.mediasoupAdapter = null;
     }
 
-    // Stop all tracks
-    this.trackController.stopAllLocalTracks();
+    // Send leave room intent
+    this.sendIntent({
+      type: 'leave_room',
+    });
 
-    // Close WebRTC
-    this.webRTCController.close();
+    // Disconnect signaling client
+    this.signalingClient.disconnect();
 
-    // Stop media
-    this.mediaController.destroy();
+    // Clear state
+    this.roomInfo = null;
+    this.localParticipant = null;
+    this.participants.clear();
+    this.rtpCapabilities = null;
 
-    // Disconnect connection
-    this.connectionController.disconnect();
-
-    // Clear participants
-    this.participantStore.clear();
-
-    // Emit disconnected event
-    this.eventBus.emit('disconnected');
-    this.eventBus.emit('connection-state-changed', ConnectionState.Disconnected);
-  }
-
-  /**
-   * Enable camera (video)
-   * @param deviceId - Optional specific device ID to use. If not provided, uses default camera.
-   */
-  async enableCamera(deviceId?: string): Promise<void> {
-    await this.ensureWebRTCInitialized();
-
-    const localParticipant = this.participantStore.getLocalParticipant();
-    if (!localParticipant) {
-      throw new Error('Local participant not found');
-    }
-
-    // Create video track with optional device selection
-    const videoTrack = deviceId
-      ? await this.mediaController.switchVideoDevice(deviceId)
-      : await this.mediaController.createVideoTrack();
-
-    const mediaTrack = (videoTrack as LocalTrackImpl).mediaTrack;
-    if (!mediaTrack) {
-      throw new Error('Failed to create video track');
-    }
-
-    // Delegate to TrackController - handles all domain construction logic
-    await this.trackController.enableCamera(mediaTrack);
-
-    logger.info('Camera enabled', deviceId ? `device: ${deviceId}` : '');
-  }
-
-  /**
-   * Disable camera (video)
-   */
-  async disableCamera(): Promise<void> {
-    // Delegate to TrackController - handles cleanup
-    await this.trackController.disableCamera();
-  }
-
-  /**
-   * Enable microphone (audio)
-   * @param deviceId - Optional specific device ID to use. If not provided, uses default microphone.
-   */
-  async enableMicrophone(deviceId?: string): Promise<void> {
-    await this.ensureWebRTCInitialized();
-
-    const localParticipant = this.participantStore.getLocalParticipant();
-    if (!localParticipant) {
-      throw new Error('Local participant not found');
-    }
-
-    // Create audio track with optional device selection
-    const audioTrack = deviceId
-      ? await this.mediaController.switchAudioDevice(deviceId)
-      : await this.mediaController.createAudioTrack();
-
-    const mediaTrack = (audioTrack as LocalTrackImpl).mediaTrack;
-    if (!mediaTrack) {
-      throw new Error('Failed to create audio track');
-    }
-
-    // Delegate to TrackController - handles all domain construction logic
-    await this.trackController.enableMicrophone(mediaTrack);
-
-    logger.info('Microphone enabled', deviceId ? `device: ${deviceId}` : '');
-  }
-
-  /**
-   * Disable microphone (audio)
-   */
-  async disableMicrophone(): Promise<void> {
-    // Delegate to TrackController - handles cleanup
-    await this.trackController.disableMicrophone();
-  }
-
-  /**
-   * List available microphones
-   */
-  async listAvailableMicrophones(): Promise<MediaDeviceInfo[]> {
-    return this.mediaController.listAvailableMicrophones();
-  }
-
-  /**
-   * List available cameras
-   */
-  async listAvailableCameras(): Promise<MediaDeviceInfo[]> {
-    return this.mediaController.listAvailableCameras();
-  }
-
-  /**
-   * Ensure WebRTC is initialized (public for handlers)
-   */
-  public async ensureWebRTCInitialized(): Promise<void> {
-    if (this.webRTCController.isReady()) {
-      return;
-    }
-
-    if (!this.rtpCapabilities) {
-      throw new Error('RTP capabilities not available. Wait for connection.');
-    }
-
-    // Initialize media controller
-    await this.mediaController.initialize();
-
-    // Initialize WebRTC controller
-    await this.webRTCController.initialize(this.rtpCapabilities);
-
-    logger.info('WebRTC initialized');
+    logger.info('Disconnected');
   }
 
   /**
@@ -394,217 +464,264 @@ export class RoomClient {
   /**
    * Get local participant
    */
-  getLocalParticipant(): LocalParticipant | null {
-    return this.participantStore.getLocalParticipant();
+  getLocalParticipant(): ParticipantInfo | null {
+    return this.localParticipant;
   }
 
   /**
    * Get all participants
    */
-  getParticipants(): RemoteParticipant[] {
-    return this.participantStore.getParticipants();
+  getParticipants(): ParticipantInfo[] {
+    return Array.from(this.participants.values());
   }
 
   /**
    * Get participant by SID
    */
-  getParticipant(sid: string): RemoteParticipant | null {
-    return this.participantStore.getParticipant(sid);
+  getParticipant(sid: string): ParticipantInfo | null {
+    return this.participants.get(sid) ?? null;
   }
 
   /**
-   * Get participant by identity
+   * Get mediasoup adapter (for advanced use cases)
    */
-  getParticipantByIdentity(identity: string): RemoteParticipant | null {
-    return this.participantStore.getParticipantByIdentity(identity);
+  getMediasoupAdapter(): MediasoupAdapter | null {
+    return this.mediasoupAdapter;
   }
 
   /**
-   * Subscribe to a track
+   * Get signaling client (for advanced use cases)
    */
-  async subscribeToTrack(
-    sid: string,
-    options?: TrackSubscribeOptions
-  ): Promise<RemoteTrack | null> {
-    logger.debug('subscribeToTrack called with sid:', sid);
-    return this.trackController.subscribeToTrack(sid, options);
-  }
-
-  /**
-   * Unsubscribe from a track
-   */
-  async unsubscribeFromTrack(sid: string): Promise<void> {
-    await this.trackController.unsubscribeFromTrack(sid);
-  }
-
-  /**
-   * Subscribe to all tracks
-   */
-  async subscribeToAllTracks(options?: TrackSubscribeOptions): Promise<void> {
-    const promises: Promise<void>[] = [];
-
-    this.participantStore.getParticipants().forEach((participant) => {
-      participant.getTracks().forEach((track: RemoteTrackPublication) => {
-        promises.push(
-          this.subscribeToTrack(track.sid, options).then(() => {
-            // Ignore result
-          })
-        );
-      });
-    });
-
-    await Promise.all(promises);
-  }
-
-  /**
-   * Unsubscribe from all tracks
-   */
-  async unsubscribeFromAllTracks(): Promise<void> {
-    const promises: Promise<void>[] = [];
-
-    this.participantStore.getParticipants().forEach((participant) => {
-      participant.getTracks().forEach((track: RemoteTrackPublication) => {
-        promises.push(this.unsubscribeFromTrack(track.sid));
-      });
-    });
-
-    await Promise.all(promises);
-  }
-
-  /**
-   * Send data to all participants
-   */
-  async sendData(data: unknown, kind: 'reliable' | 'lossy' = 'reliable'): Promise<void> {
-    if (!this.dataProvider) {
-      throw new Error('Data provider not initialized');
-    }
-
-    await this.dataProvider.send(data, kind as DataChannelKind);
-  }
-
-  /**
-   * Call a participant
-   * @param targetParticipantSid - The SID of the participant to call
-   * @param metadata - Optional metadata to send with the call
-   */
-  async call(targetParticipantSid: string, metadata?: Record<string, unknown>): Promise<void> {
-    this.send({
-      type: 'call',
-      targetParticipantSid,
-      metadata,
-    });
-    logger.info(`Calling participant: ${targetParticipantSid}`);
-  }
-
-  /**
-   * Accept an incoming call
-   * @param callId - The ID of the call to accept
-   * @param metadata - Optional metadata to send with the acceptance
-   */
-  async acceptCall(callId: string, metadata?: Record<string, unknown>): Promise<void> {
-    this.send({
-      type: 'accept_call',
-      callId,
-      metadata,
-    });
-    logger.info(`Accepting call: ${callId}`);
-  }
-
-  /**
-   * Reject an incoming call
-   * @param callId - The ID of the call to reject
-   * @param reason - Optional reason for rejection
-   */
-  async rejectCall(callId: string, reason?: string): Promise<void> {
-    this.send({
-      type: 'reject_call',
-      callId,
-      reason,
-    });
-    logger.info(`Rejecting call: ${callId}${reason ? `, reason: ${reason}` : ''}`);
+  getSignalingClient(): SignalingClient {
+    return this.signalingClient;
   }
 
   /**
    * Add event listener
    */
   on<K extends keyof RoomEvents>(event: K, listener: RoomEvents[K]): void {
-    this.eventBus.on(event, listener);
+    if (!this.eventListeners.has(event)) {
+      this.eventListeners.set(event, new Set());
+    }
+    (this.eventListeners.get(event) as Set<(data: unknown) => void>).add(
+      listener as (data: unknown) => void
+    );
   }
 
   /**
    * Remove event listener
    */
   off<K extends keyof RoomEvents>(event: K, listener: RoomEvents[K]): void {
-    this.eventBus.off(event, listener);
+    (this.eventListeners.get(event) as Set<(data: unknown) => void>)?.delete(
+      listener as (data: unknown) => void
+    );
   }
 
   /**
    * Remove all event listeners
    */
   removeAllListeners(): void {
-    this.eventBus.removeAllListeners();
+    this.eventListeners.clear();
   }
 
   /**
-   * Get RTP capabilities
+   * Initialize mediasoup adapter
    */
-  public getRtpCapabilities(): RtpCapabilities | null {
-    return this.rtpCapabilities;
+  private async initializeMediasoupAdapter(): Promise<void> {
+    if (this.mediasoupAdapter) {
+      return;
+    }
+
+    if (!this.rtpCapabilities) {
+      throw new Error('RTP capabilities not available. Wait for room joined.');
+    }
+
+    logger.info('Initializing mediasoup adapter...');
+
+    this.mediasoupAdapter = new MediasoupAdapterImpl({
+      signalingClient: this.signalingClient,
+      rtpCapabilities: this.rtpCapabilities,
+      onStateChange: (state) => {
+        logger.debug('Mediasoup adapter state changed:', { state });
+      },
+      onError: (error) => {
+        logger.error('Mediasoup adapter error:', { error });
+        this.emit('error', error);
+      },
+      onTrackPublished: (producerId, trackSid) => {
+        logger.info('Track published:', { producerId, trackSid });
+      },
+      onTrackUnpublished: (trackSid) => {
+        logger.info('Track unpublished:', { trackSid });
+      },
+      onTrackSubscribed: (consumerId, trackSid) => {
+        logger.info('Track subscribed:', { consumerId, trackSid });
+      },
+      onTrackUnsubscribed: (trackSid) => {
+        logger.info('Track unsubscribed:', { trackSid });
+      },
+    });
+
+    await this.mediasoupAdapter.initialize();
+
+    logger.info('Mediasoup adapter initialized');
   }
 
   /**
-   * Emit event (public for handlers)
+   * Setup signaling client listeners
    */
-  public emit<K extends keyof RoomEvents>(event: K, data?: unknown): void {
-    this.eventBus.emit(event, data);
+  private setupSignalingListeners(): void {
+    this.signalingClient.onStateChange((state) => {
+      logger.debug('Signaling state changed:', { state });
+      this.emit('connection-state-changed', state);
+    });
+
+    this.signalingClient.onError((error) => {
+      logger.error('Signaling error:', { error });
+      this.emit('error', error);
+    });
+
+    this.signalingClient.onMessage((message) => {
+      this.handleServerMessage(message as unknown as ServerResponse);
+    });
   }
 
   /**
-   * Set room info (called by handlers)
+   * Handle server message
    */
-  public setRoomInfo(info: RoomInfo): void {
-    this.roomInfo = info;
+  private handleServerMessage(message: ServerResponse): void {
+    logger.debug('Server message received:', { type: message.type });
+
+    switch (message.type) {
+      case 'room_joined':
+        this.roomInfo = message.room;
+        this.localParticipant = message.participant;
+        message.otherParticipants.forEach((participant) => {
+          this.participants.set(participant.sid, participant);
+        });
+        this.emit('room-joined', {
+          room: message.room,
+          participant: message.participant,
+          otherParticipants: message.otherParticipants,
+        });
+        break;
+
+      case 'participant_joined':
+        this.participants.set(message.participant.sid, message.participant);
+        this.emit('participant-joined', message.participant);
+        break;
+
+      case 'participant_left':
+        this.participants.delete(message.participantSid);
+        this.emit('participant-left', message.participantSid);
+        break;
+
+      case 'call_received':
+        this.emit('call-received', {
+          callId: message.callId,
+          caller: message.caller,
+          metadata: message.metadata,
+        });
+        break;
+
+      case 'call_accepted':
+        this.emit('call-accepted', {
+          callId: message.callId,
+          participant: message.participant,
+        });
+        break;
+
+      case 'call_rejected':
+        this.emit('call-rejected', {
+          callId: message.callId,
+          participant: message.participant,
+          reason: message.reason,
+        });
+        break;
+
+      case 'call_ended':
+        this.emit('call-ended', {
+          callId: message.callId,
+          reason: message.reason,
+        });
+        break;
+
+      case 'track_published':
+        this.emit('track-published', {
+          participantSid: message.participantSid,
+          track: message.track,
+        });
+        break;
+
+      case 'track_unpublished':
+        this.emit('track-unpublished', {
+          participantSid: message.participantSid,
+          trackSid: message.trackSid,
+        });
+        break;
+
+      case 'track_subscribed':
+        this.emit('track-subscribed', {
+          participantSid: message.participantSid,
+          track: message.track,
+        });
+        break;
+
+      case 'track_unsubscribed':
+        this.emit('track-unsubscribed', {
+          participantSid: message.participantSid,
+          trackSid: message.trackSid,
+        });
+        break;
+
+      case 'track_muted':
+        this.emit('track-muted', {
+          participantSid: message.participantSid,
+          trackSid: message.trackSid,
+        });
+        break;
+
+      case 'track_unmuted':
+        this.emit('track-unmuted', {
+          participantSid: message.participantSid,
+          trackSid: message.trackSid,
+        });
+        break;
+
+      case 'data_received':
+        this.emit('data-received', {
+          participantSid: message.participantSid,
+          payload: message.payload,
+          kind: message.kind,
+        });
+        break;
+
+      case 'error':
+        this.emit('error', new Error(message.error.message));
+        break;
+
+      default:
+        logger.warn('Unknown message type:', { type: (message as { type: string }).type });
+    }
   }
 
   /**
-   * Set RTP capabilities (called by handlers)
+   * Send intent to server
    */
-  public setRtpCapabilities(capabilities: RtpCapabilities | null): void {
-    this.rtpCapabilities = capabilities;
+  private sendIntent(intent: ClientIntent): void {
+    this.signalingClient.send(intent as unknown as Record<string, unknown>);
   }
 
   /**
-   * Set local participant (called by handlers)
+   * Emit event
    */
-  public setLocalParticipant(participant: LocalParticipantImpl): void {
-    this.participantStore.setLocalParticipant(participant);
-  }
-
-  /**
-   * Add participant (called by handlers)
-   */
-  public addParticipant(participant: RemoteParticipantImpl): void {
-    this.participantStore.addParticipant(participant);
-  }
-
-  /**
-   * Remove participant (called by handlers)
-   */
-  public removeParticipant(sid: string): RemoteParticipantImpl | null {
-    return this.participantStore.removeParticipant(sid);
-  }
-
-  /**
-   * Send message via WebSocket (public for handlers and WebRTC)
-   */
-  public send(message: Record<string, unknown>): void {
-    this.connectionController.send(message);
-  }
-
-  /**
-   * Get the WebRTC controller (public for handlers)
-   */
-  public getWebRTCController(): WebRTCController | null {
-    return this.webRTCController;
+  private emit<K extends keyof RoomEvents>(event: K, data: Parameters<RoomEvents[K]>[0]): void {
+    (this.eventListeners.get(event) as Set<(data: unknown) => void>)?.forEach((listener) => {
+      try {
+        listener(data);
+      } catch (error) {
+        logger.error('Error in event listener:', { event, error });
+      }
+    });
   }
 }

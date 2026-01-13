@@ -3,11 +3,23 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import type { CallInfo } from '../types';
+import type { ParticipantInfo } from '@bytepulse/pulsewave-shared';
 import { useRoomContext } from '../context';
 import { createModuleLogger } from '../utils/logger';
 
 const logger = createModuleLogger('hook:incoming-call');
+
+/**
+ * Call info type
+ */
+export interface CallInfo {
+  callId: string;
+  callerSid: string;
+  targetSid: string;
+  state: 'pending' | 'accepted' | 'rejected' | 'ended';
+  caller?: ParticipantInfo;
+  metadata?: Record<string, unknown>;
+}
 
 /**
  * useIncomingCall - Hook to handle incoming calls
@@ -20,48 +32,63 @@ export function useIncomingCall() {
     if (!room) return;
 
     // Listen for call received events
-    const handleCallReceived = (callInfo: CallInfo) => {
+    const handleCallReceived = (data: {
+      callId: string;
+      caller: ParticipantInfo;
+      metadata?: Record<string, unknown>;
+    }) => {
       logger.info('Incoming call received', {
-        callId: callInfo.callId,
-        caller: callInfo.callerSid,
+        callId: data.callId,
+        caller: data.caller.sid,
       });
-      setIncomingCall(callInfo);
+      setIncomingCall({
+        callId: data.callId,
+        callerSid: data.caller.sid,
+        targetSid: '',
+        state: 'pending',
+        caller: data.caller,
+        metadata: data.metadata,
+      });
     };
 
     // Listen for call accepted events (to clear incoming call if accepted)
-    const handleCallAccepted = (callInfo: CallInfo) => {
-      if (incomingCall?.callId === callInfo.callId) {
-        logger.info('Incoming call accepted', { callId: callInfo.callId });
+    const handleCallAccepted = (data: { callId: string; participant: ParticipantInfo }) => {
+      if (incomingCall?.callId === data.callId) {
+        logger.info('Incoming call accepted', { callId: data.callId });
         setIncomingCall(null);
       }
     };
 
     // Listen for call rejected events (to clear incoming call if rejected)
-    const handleCallRejected = (callInfo: CallInfo) => {
-      if (incomingCall?.callId === callInfo.callId) {
-        logger.info('Incoming call rejected', { callId: callInfo.callId });
+    const handleCallRejected = (data: {
+      callId: string;
+      participant: ParticipantInfo;
+      reason?: string;
+    }) => {
+      if (incomingCall?.callId === data.callId) {
+        logger.info('Incoming call rejected', { callId: data.callId });
         setIncomingCall(null);
       }
     };
 
     // Listen for call ended events (to clear incoming call if ended)
-    const handleCallEnded = (callInfo: CallInfo) => {
-      if (incomingCall?.callId === callInfo.callId) {
-        logger.info('Incoming call ended', { callId: callInfo.callId });
+    const handleCallEnded = (data: { callId: string; reason?: string }) => {
+      if (incomingCall?.callId === data.callId) {
+        logger.info('Incoming call ended', { callId: data.callId });
         setIncomingCall(null);
       }
     };
 
-    room.on('call-received', handleCallReceived);
-    room.on('call-accepted', handleCallAccepted);
-    room.on('call-rejected', handleCallRejected);
-    room.on('call-ended', handleCallEnded);
+    room.on('call-received', handleCallReceived as never);
+    room.on('call-accepted', handleCallAccepted as never);
+    room.on('call-rejected', handleCallRejected as never);
+    room.on('call-ended', handleCallEnded as never);
 
     return () => {
-      room.off('call-received', handleCallReceived);
-      room.off('call-accepted', handleCallAccepted);
-      room.off('call-rejected', handleCallRejected);
-      room.off('call-ended', handleCallEnded);
+      room.off('call-received', handleCallReceived as never);
+      room.off('call-accepted', handleCallAccepted as never);
+      room.off('call-rejected', handleCallRejected as never);
+      room.off('call-ended', handleCallEnded as never);
     };
   }, [room, incomingCall]);
 

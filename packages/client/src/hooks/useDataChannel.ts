@@ -3,17 +3,7 @@
  */
 
 import { useCallback, useEffect, useRef } from 'react';
-import type { DataPacket } from '@bytepulse/pulsewave-shared';
-import type { RemoteParticipant, RoomEvents } from '../types';
 import { useRoomContext } from '../context';
-
-/**
- * Type for data-received event data
- */
-interface DataReceivedEventData {
-  data: DataPacket;
-  participant: RemoteParticipant;
-}
 
 /**
  * Data message received from a participant
@@ -22,11 +12,11 @@ export type DataMessage = {
   /** The raw data received (string, ArrayBuffer, or ArrayBufferView) */
   data: string | ArrayBuffer | ArrayBufferView;
   /** The participant who sent the data */
-  participant: RemoteParticipant;
+  participantSid: string;
   /** The kind of data channel used */
   kind: 'reliable' | 'lossy';
   /** Timestamp when the data was sent */
-  timestamp: number;
+  timestamp?: number;
 };
 
 /**
@@ -72,19 +62,13 @@ export function useDataChannelListener(callback: (message: DataMessage) => void)
   const isListeningRef = useRef(false);
 
   const handleDataReceived = useCallback(
-    (eventData: unknown) => {
-      const packet = eventData as DataReceivedEventData;
-
-      // Extract the raw data from the DataPacket
-      const rawData = packet.data.value as string | ArrayBuffer | ArrayBufferView;
-
+    (data: { participantSid: string; payload: unknown; kind?: 'reliable' | 'lossy' }) => {
       // Only call callback if we have valid data
-      if (rawData !== undefined && rawData !== null) {
+      if (data.payload !== undefined && data.payload !== null) {
         callback({
-          data: rawData,
-          participant: packet.participant,
-          kind: packet.data.kind,
-          timestamp: packet.data.timestamp,
+          data: data.payload as string | ArrayBuffer | ArrayBufferView,
+          participantSid: data.participantSid,
+          kind: data.kind || 'reliable',
         });
       }
     },
@@ -98,11 +82,11 @@ export function useDataChannelListener(callback: (message: DataMessage) => void)
     }
 
     isListeningRef.current = true;
-    room.on('data-received', handleDataReceived as RoomEvents['data-received']);
+    room.on('data-received', handleDataReceived as never);
 
     return () => {
       if (isListeningRef.current) {
-        room.off('data-received', handleDataReceived as RoomEvents['data-received']);
+        room.off('data-received', handleDataReceived as never);
         isListeningRef.current = false;
       }
     };

@@ -3,23 +3,21 @@
  */
 
 import { useMemo } from 'react';
-import type { RemoteTrack, RemoteTrackPublication } from '../types';
-import { TrackKind } from '@bytepulse/pulsewave-shared';
+import type { TrackInfo } from '@bytepulse/pulsewave-shared';
+import type { TrackKind } from '@bytepulse/pulsewave-shared';
 import { useRoomContext } from '../context';
 
 /**
  * useTracks - Hook to access all remote tracks
  */
-export function useTracks(): RemoteTrack[] {
+export function useTracks(): TrackInfo[] {
   const { participants } = useRoomContext();
 
   return useMemo(() => {
-    const tracks: RemoteTrack[] = [];
+    const tracks: TrackInfo[] = [];
     participants.forEach((participant) => {
-      participant.getTracks().forEach((publication) => {
-        if (publication.track) {
-          tracks.push(publication.track);
-        }
+      participant.tracks.forEach((track) => {
+        tracks.push(track);
       });
     });
     return tracks;
@@ -29,7 +27,7 @@ export function useTracks(): RemoteTrack[] {
 /**
  * useTracksByKind - Hook to access remote tracks by kind
  */
-export function useTracksByKind(kind: TrackKind): RemoteTrack[] {
+export function useTracksByKind(kind: TrackKind): TrackInfo[] {
   const tracks = useTracks();
 
   return useMemo(() => tracks.filter((track) => track.kind === kind), [tracks, kind]);
@@ -38,27 +36,27 @@ export function useTracksByKind(kind: TrackKind): RemoteTrack[] {
 /**
  * useAudioTracks - Hook to access all remote audio tracks
  */
-export function useAudioTracks(): RemoteTrack[] {
+export function useAudioTracks(): TrackInfo[] {
   return useTracksByKind('audio' as TrackKind);
 }
 
 /**
  * useVideoTracks - Hook to access all remote video tracks
  */
-export function useVideoTracks(): RemoteTrack[] {
+export function useVideoTracks(): TrackInfo[] {
   return useTracksByKind('video' as TrackKind);
 }
 
 /**
  * useTrackPublications - Hook to access all remote track publications
  */
-export function useTrackPublications(): RemoteTrackPublication[] {
+export function useTrackPublications(): TrackInfo[] {
   const { participants } = useRoomContext();
 
   return useMemo(() => {
-    const publications: RemoteTrackPublication[] = [];
+    const publications: TrackInfo[] = [];
     participants.forEach((participant) => {
-      publications.push(...participant.getTracks());
+      publications.push(...participant.tracks);
     });
     return publications;
   }, [participants]);
@@ -67,7 +65,7 @@ export function useTrackPublications(): RemoteTrackPublication[] {
 /**
  * useTrackPublicationsByKind - Hook to access track publications by kind
  */
-export function useTrackPublicationsByKind(kind: TrackKind): RemoteTrackPublication[] {
+export function useTrackPublicationsByKind(kind: TrackKind): TrackInfo[] {
   const publications = useTrackPublications();
 
   return useMemo(() => publications.filter((pub) => pub.kind === kind), [publications, kind]);
@@ -80,12 +78,16 @@ export function useTrackPublicationsByKind(kind: TrackKind): RemoteTrackPublicat
  * Automatically updates when tracks are published, unpublished, muted, or unmuted.
  */
 export function useLocalTracks() {
-  const { localTracks } = useRoomContext();
+  const { localParticipant } = useRoomContext();
 
   return useMemo(() => {
-    const audioTracks = localTracks.filter((t) => t.kind === 'audio');
-    const videoTracks = localTracks.filter((t) => t.kind === 'video');
+    if (!localParticipant) {
+      return { audioTracks: [], videoTracks: [], allTracks: [] };
+    }
 
-    return { audioTracks, videoTracks, allTracks: localTracks };
-  }, [localTracks]);
+    const audioTracks = localParticipant.tracks.filter((t) => t.kind === 'audio');
+    const videoTracks = localParticipant.tracks.filter((t) => t.kind === 'video');
+
+    return { audioTracks, videoTracks, allTracks: localParticipant.tracks };
+  }, [localParticipant]);
 }

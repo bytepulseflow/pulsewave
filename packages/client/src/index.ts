@@ -7,6 +7,7 @@ import './components/styles.css';
 
 // Export client classes
 export { RoomClient } from './client';
+export type { RoomClientOptions, RoomEvents } from './client';
 export { Track } from './client/Track';
 export { LocalTrack } from './client/LocalTrack';
 export { RemoteTrack } from './client/RemoteTrack';
@@ -17,6 +18,12 @@ export {
 } from './client/TrackPublication';
 export { ParticipantImpl, RemoteParticipantImpl } from './client/Participant';
 export { LocalParticipantImpl } from './client/LocalParticipant';
+
+// Export signaling layer (new architecture)
+export * from './signaling';
+
+// Export adapter layer (new architecture)
+export * from './adapter';
 
 // Export media classes
 export { MediaManager } from './media';
@@ -33,12 +40,10 @@ export type { RoomContextValue, RoomProviderProps } from './context';
 
 // Export types (excluding conflicting ones)
 export type {
-  RoomClientOptions,
   MediaTrackOptions,
   TrackPublishOptions,
   TrackSubscribeOptions,
   DataChannelOptions,
-  RoomEvents,
   ParticipantEvents,
   LocalParticipantEvents,
   TrackEvents,

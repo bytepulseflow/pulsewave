@@ -2,13 +2,13 @@
  * useLocalParticipant - Hook to access local participant state
  */
 
-import type { LocalParticipant } from '../types';
+import type { ParticipantInfo } from '@bytepulse/pulsewave-shared';
 import { useRoomContext } from '../context';
 
 /**
  * useLocalParticipant - Hook to access local participant state
  */
-export function useLocalParticipant(): LocalParticipant | null {
+export function useLocalParticipant(): ParticipantInfo | null {
   const { localParticipant } = useRoomContext();
   return localParticipant;
 }

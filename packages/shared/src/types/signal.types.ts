@@ -1,11 +1,375 @@
 /**
  * WebSocket signaling message types
+ *
+ * This file defines both intent-based signaling messages (for the new architecture)
+ * and WebRTC-shaped messages (for backward compatibility with the adapter layer).
+ *
+ * Intent-based messages are high-level business intents (e.g., "join_room", "call")
+ * WebRTC-shaped messages are low-level operations (e.g., "create_transport", "publish")
  */
 
 import type { RoomInfo, ParticipantInfo, TrackInfo, ErrorInfo, TrackKind } from './room.types';
+import type {
+  RtpCapabilities,
+  RtpParameters,
+  DtlsParameters,
+  SctpStreamParameters,
+  SctpParameters,
+  IceParameters,
+  IceCandidate,
+} from './adapter.types';
 
 // ============================================================================
-// Client -> Server Messages
+// Intent-Based Messages (New Architecture)
+// ============================================================================
+
+/**
+ * Intent: Join a room (presence-only, no media)
+ */
+export interface JoinRoomIntent {
+  type: 'join_room';
+  room: string;
+  token: string;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Intent: Leave a room
+ */
+export interface LeaveRoomIntent {
+  type: 'leave_room';
+}
+
+/**
+ * Intent: Start a call (initiate media session)
+ */
+export interface StartCallIntent {
+  type: 'start_call';
+  targetParticipantSid: string;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Intent: Accept a call
+ */
+export interface AcceptCallIntent {
+  type: 'accept_call';
+  callId: string;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Intent: Reject a call
+ */
+export interface RejectCallIntent {
+  type: 'reject_call';
+  callId: string;
+  reason?: string;
+}
+
+/**
+ * Intent: End a call
+ */
+export interface EndCallIntent {
+  type: 'end_call';
+  callId: string;
+  reason?: string;
+}
+
+/**
+ * Intent: Enable camera
+ */
+export interface EnableCameraIntent {
+  type: 'enable_camera';
+  deviceId?: string;
+}
+
+/**
+ * Intent: Disable camera
+ */
+export interface DisableCameraIntent {
+  type: 'disable_camera';
+}
+
+/**
+ * Intent: Enable microphone
+ */
+export interface EnableMicrophoneIntent {
+  type: 'enable_microphone';
+  deviceId?: string;
+}
+
+/**
+ * Intent: Disable microphone
+ */
+export interface DisableMicrophoneIntent {
+  type: 'disable_microphone';
+}
+
+/**
+ * Intent: Send data message
+ */
+export interface SendDataIntent {
+  type: 'send_data';
+  payload: unknown;
+  kind?: 'reliable' | 'lossy';
+}
+
+/**
+ * Intent: Subscribe to participant's tracks
+ */
+export interface SubscribeToParticipantIntent {
+  type: 'subscribe_to_participant';
+  participantSid: string;
+}
+
+/**
+ * Intent: Unsubscribe from participant's tracks
+ */
+export interface UnsubscribeFromParticipantIntent {
+  type: 'unsubscribe_from_participant';
+  participantSid: string;
+}
+
+/**
+ * Intent: Mute track
+ */
+export interface MuteTrackIntent {
+  type: 'mute_track';
+  trackSid: string;
+}
+
+/**
+ * Intent: Unmute track
+ */
+export interface UnmuteTrackIntent {
+  type: 'unmute_track';
+  trackSid: string;
+}
+
+/**
+ * Client intent union (new architecture)
+ */
+export type ClientIntent =
+  | JoinRoomIntent
+  | LeaveRoomIntent
+  | StartCallIntent
+  | AcceptCallIntent
+  | RejectCallIntent
+  | EndCallIntent
+  | EnableCameraIntent
+  | DisableCameraIntent
+  | EnableMicrophoneIntent
+  | DisableMicrophoneIntent
+  | SendDataIntent
+  | SubscribeToParticipantIntent
+  | UnsubscribeFromParticipantIntent
+  | MuteTrackIntent
+  | UnmuteTrackIntent;
+
+// ============================================================================
+// Server Intent Responses (New Architecture)
+// ============================================================================
+
+/**
+ * Response: Room joined (presence-only)
+ */
+export interface RoomJoinedResponse {
+  type: 'room_joined';
+  room: RoomInfo;
+  participant: ParticipantInfo;
+  otherParticipants: ParticipantInfo[];
+}
+
+/**
+ * Response: Call started
+ */
+export interface CallStartedResponse {
+  type: 'call_started';
+  callId: string;
+  target: ParticipantInfo;
+}
+
+/**
+ * Response: Call received (incoming call)
+ */
+export interface CallReceivedResponse {
+  type: 'call_received';
+  callId: string;
+  caller: ParticipantInfo;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Response: Call accepted
+ */
+export interface CallAcceptedResponse {
+  type: 'call_accepted';
+  callId: string;
+  participant: ParticipantInfo;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Response: Call rejected
+ */
+export interface CallRejectedResponse {
+  type: 'call_rejected';
+  callId: string;
+  participant: ParticipantInfo;
+  reason?: string;
+}
+
+/**
+ * Response: Call ended
+ */
+export interface CallEndedResponse {
+  type: 'call_ended';
+  callId: string;
+  reason?: string;
+}
+
+/**
+ * Response: Camera enabled
+ */
+export interface CameraEnabledResponse {
+  type: 'camera_enabled';
+  trackSid: string;
+}
+
+/**
+ * Response: Camera disabled
+ */
+export interface CameraDisabledResponse {
+  type: 'camera_disabled';
+  trackSid: string;
+}
+
+/**
+ * Response: Microphone enabled
+ */
+export interface MicrophoneEnabledResponse {
+  type: 'microphone_enabled';
+  trackSid: string;
+}
+
+/**
+ * Response: Microphone disabled
+ */
+export interface MicrophoneDisabledResponse {
+  type: 'microphone_disabled';
+  trackSid: string;
+}
+
+/**
+ * Response: Data received
+ */
+export interface DataReceivedResponse {
+  type: 'data_received';
+  participantSid: string;
+  payload: unknown;
+  kind?: 'reliable' | 'lossy';
+}
+
+/**
+ * Response: Participant joined
+ */
+export interface ParticipantJoinedResponse {
+  type: 'participant_joined';
+  participant: ParticipantInfo;
+}
+
+/**
+ * Response: Participant left
+ */
+export interface ParticipantLeftResponse {
+  type: 'participant_left';
+  participantSid: string;
+}
+
+/**
+ * Response: Track published
+ */
+export interface TrackPublishedResponse {
+  type: 'track_published';
+  participantSid: string;
+  track: TrackInfo;
+}
+
+/**
+ * Response: Track unpublished
+ */
+export interface TrackUnpublishedResponse {
+  type: 'track_unpublished';
+  participantSid: string;
+  trackSid: string;
+}
+
+/**
+ * Response: Track subscribed
+ */
+export interface TrackSubscribedResponse {
+  type: 'track_subscribed';
+  participantSid: string;
+  track: TrackInfo;
+  consumerId?: string;
+  rtpParameters?: RtpParameters;
+}
+
+/**
+ * Response: Track unsubscribed
+ */
+export interface TrackUnsubscribedResponse {
+  type: 'track_unsubscribed';
+  participantSid: string;
+  trackSid: string;
+}
+
+/**
+ * Response: Track muted
+ */
+export interface TrackMutedResponse {
+  type: 'track_muted';
+  participantSid: string;
+  trackSid: string;
+}
+
+/**
+ * Response: Track unmuted
+ */
+export interface TrackUnmutedResponse {
+  type: 'track_unmuted';
+  participantSid: string;
+  trackSid: string;
+}
+
+/**
+ * Server response union (new architecture)
+ */
+export type ServerResponse =
+  | RoomJoinedResponse
+  | CallStartedResponse
+  | CallReceivedResponse
+  | CallAcceptedResponse
+  | CallRejectedResponse
+  | CallEndedResponse
+  | CameraEnabledResponse
+  | CameraDisabledResponse
+  | MicrophoneEnabledResponse
+  | MicrophoneDisabledResponse
+  | DataReceivedResponse
+  | ParticipantJoinedResponse
+  | ParticipantLeftResponse
+  | TrackPublishedResponse
+  | TrackUnpublishedResponse
+  | TrackSubscribedResponse
+  | TrackUnsubscribedResponse
+  | TrackMutedResponse
+  | TrackUnmutedResponse
+  | ErrorMessage;
+
+// ============================================================================
+// WebRTC-Shaped Messages (Adapter Layer Only)
 // ============================================================================
 
 /**
@@ -165,18 +529,6 @@ export interface DataConsumerCreatedMessage {
   protocol?: string;
   ordered?: boolean;
   sctpStreamParameters: SctpStreamParameters;
-}
-
-/**
- * SCTP stream parameters
- */
-export interface SctpStreamParameters {
-  streamId: number;
-  ordered?: boolean;
-  maxPacketLifeTime?: number;
-  maxRetransmits?: number;
-  label?: string;
-  protocol?: string;
 }
 
 /**
@@ -383,16 +735,6 @@ export interface ParticipantLeftMessage {
 }
 
 /**
- * SCTP parameters (for WebRTC data channels)
- */
-export interface SctpParameters {
-  port: number;
-  OS: number;
-  MIS: number;
-  maxMessageSize: number;
-}
-
-/**
  * Transport created message
  */
 export interface TransportCreatedMessage {
@@ -411,73 +753,6 @@ export interface TransportCreatedMessage {
 export interface TransportConnectedMessage {
   type: 'transport_connected';
   transportId: string;
-}
-
-/**
- * Track published message (notification to others)
- */
-export interface TrackPublishedMessage {
-  type: 'track_published';
-  participantSid: string;
-  track: TrackInfo;
-}
-
-/**
- * Track published response (to publisher)
- */
-export interface TrackPublishResponse {
-  type: 'track_published';
-  id: string;
-  trackSid: string;
-}
-
-/**
- * Track unpublished message
- */
-export interface TrackUnpublishedMessage {
-  type: 'track_unpublished';
-  participantSid: string;
-  trackSid: string;
-}
-
-/**
- * Track subscribed message
- */
-export interface TrackSubscribedMessage {
-  type: 'track_subscribed';
-  id: string;
-  producerId: string;
-  kind: string; // Allow 'audio' | 'video' from mediasoup
-  rtpParameters: RtpParameters;
-  trackSid: string;
-}
-
-/**
- * Track unsubscribed message
- */
-export interface TrackUnsubscribedMessage {
-  type: 'track_unsubscribed';
-  trackSid: string;
-}
-
-/**
- * Track muted message
- */
-export interface TrackMutedMessage {
-  type: 'track_muted';
-  participantSid: string;
-  trackSid: string;
-  muted: boolean;
-}
-
-/**
- * Track unmuted message
- */
-export interface TrackUnmutedMessage {
-  type: 'track_unmuted';
-  participantSid: string;
-  trackSid: string;
-  muted: boolean;
 }
 
 /**
@@ -508,7 +783,6 @@ export type ServerMessage =
   | ParticipantJoinedMessage
   | ParticipantLeftMessage
   | TrackPublishedMessage
-  | TrackPublishResponse
   | TrackUnpublishedMessage
   | TrackSubscribedMessage
   | TrackUnsubscribedMessage
@@ -524,143 +798,3 @@ export type ServerMessage =
   | CallRejectedMessage
   | CallEndedMessage
   | ErrorMessage;
-
-// ============================================================================
-// WebRTC Types
-// ============================================================================
-
-/**
- * RTP parameters (simplified) - compatible with mediasoup types
- */
-export interface RtpParameters {
-  codecs?: RtpCodecParameters[];
-  headerExtensions?: RtpHeaderExtensionParameters[];
-  encodings?: RtpEncodingParameters[];
-  rtcp?: RtcpParameters;
-}
-
-/**
- * RTP codec parameters
- */
-export interface RtpCodecParameters {
-  mimeType: string;
-  clockRate: number;
-  channels?: number;
-  parameters?: Record<string, unknown>;
-}
-
-/**
- * RTP header extension parameters
- */
-export interface RtpHeaderExtensionParameters {
-  uri: string;
-  id: number;
-  encrypt?: boolean;
-  parameters?: Record<string, unknown>;
-}
-
-/**
- * RTP encoding parameters
- */
-export interface RtpEncodingParameters {
-  ssrc?: number;
-  rid?: string;
-  codecPayloadType?: number;
-  rtx?: {
-    ssrc: number;
-  };
-  dtx?: boolean;
-  scalabilityMode?: string;
-  scaleResolutionDownBy?: number;
-  maxBitrate?: number;
-  maxFramerate?: number;
-  adaptivePtime?: boolean;
-  priority?: 'very-low' | 'low' | 'medium' | 'high';
-  networkPriority?: 'very-low' | 'low' | 'medium' | 'high';
-}
-
-/**
- * RTCP parameters
- */
-export interface RtcpParameters {
-  cname?: string;
-  reducedSize?: boolean;
-  mux?: boolean;
-}
-
-/**
- * RTP capabilities
- */
-export interface RtpCapabilities {
-  codecs: RtpCodecCapability[];
-  headerExtensions: RtpHeaderExtension[];
-}
-
-/**
- * RTP codec capability
- */
-export interface RtpCodecCapability {
-  mimeType: string;
-  kind?: string;
-  preferredPayloadType?: number;
-  clockRate: number;
-  channels?: number;
-  parameters?: Record<string, unknown>;
-  rtcpFeedback?: RtcpFeedback[];
-}
-
-/**
- * RTP header extension
- */
-export interface RtpHeaderExtension {
-  uri: string;
-  preferredId: number;
-  preferredEncrypt?: boolean;
-  direction?: 'sendrecv' | 'send' | 'recv' | 'sendonly' | 'recvonly' | 'inactive';
-}
-
-/**
- * RTCP feedback
- */
-export interface RtcpFeedback {
-  type: string;
-  parameter?: string;
-}
-
-/**
- * ICE parameters
- */
-export interface IceParameters {
-  usernameFragment: string;
-  password: string;
-  iceLite?: boolean;
-}
-
-/**
- * ICE candidate
- */
-export interface IceCandidate {
-  foundation: string;
-  priority: number;
-  ip: string;
-  protocol: 'udp' | 'tcp';
-  port: number;
-  type: 'host';
-  tcpType?: 'passive';
-}
-
-/**
- * DTLS parameters
- */
-export interface DtlsParameters {
-  role?: 'auto' | 'client' | 'server';
-  fingerprints: DtlsFingerprint[];
-}
-
-/**
- * DTLS fingerprint
- */
-export interface DtlsFingerprint {
-  algorithm: string;
-  value: string;
-}

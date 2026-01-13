@@ -11,14 +11,8 @@ import React, {
   useRef,
   ReactNode,
 } from 'react';
-import { ConnectionState } from '@bytepulse/pulsewave-shared';
-import type {
-  RoomClientOptions,
-  LocalParticipant,
-  RemoteParticipant,
-  Participant,
-  LocalTrackPublication,
-} from '../types';
+import type { ConnectionState, ParticipantInfo } from '@bytepulse/pulsewave-shared';
+import type { RoomClientOptions } from '../client/RoomClient';
 import { RoomClient } from '../client/RoomClient';
 import { createModuleLogger } from '../utils/logger';
 
@@ -41,17 +35,12 @@ export interface RoomContextValue {
   /**
    * Local participant
    */
-  localParticipant: LocalParticipant | null;
-
-  /**
-   * Local participant's tracks (immutable snapshot)
-   */
-  localTracks: LocalTrackPublication[];
+  localParticipant: ParticipantInfo | null;
 
   /**
    * Remote participants
    */
-  participants: RemoteParticipant[];
+  participants: ParticipantInfo[];
 
   /**
    * Whether currently connecting
@@ -124,9 +113,8 @@ export function RoomProvider({
   const [connectionState, setConnectionState] = useState<ConnectionState>(
     'disconnected' as ConnectionState
   );
-  const [localParticipant, setLocalParticipant] = useState<LocalParticipant | null>(null);
-  const [localTracks, setLocalTracks] = useState<LocalTrackPublication[]>([]);
-  const [participants, setParticipants] = useState<RemoteParticipant[]>([]);
+  const [localParticipant, setLocalParticipant] = useState<ParticipantInfo | null>(null);
+  const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
@@ -151,66 +139,42 @@ export function RoomProvider({
       setRoom(roomClient);
 
       // Set up event listeners
-      roomClient.on('connection-state-changed', (state: ConnectionState) => {
-        setConnectionState(state);
-        onConnectionStateChanged?.(state);
+      roomClient.on('connection-state-changed', (state) => {
+        // Map new connection states to ConnectionState
+        const mappedState =
+          state === 'connected'
+            ? ('connected' as ConnectionState)
+            : state === 'connecting'
+              ? ('connecting' as ConnectionState)
+              : state === 'disconnected'
+                ? ('disconnected' as ConnectionState)
+                : state === 'reconnecting'
+                  ? ('reconnecting' as ConnectionState)
+                  : ('disconnected' as ConnectionState);
+        setConnectionState(mappedState);
+        onConnectionStateChanged?.(mappedState);
       });
 
-      roomClient.on('local-participant-joined', (participant: LocalParticipant) => {
-        setLocalParticipant(participant);
-
-        // Initialize local tracks from participant
-        setLocalTracks([...participant.getTracks()]);
-
-        // Set up track event listeners to sync React state
-        const syncTracks = () => {
-          setLocalTracks([...participant.getTracks()]);
-        };
-
-        participant.on('track-published', syncTracks as (pub: unknown) => void);
-        participant.on('track-unpublished', syncTracks as (pub: unknown) => void);
-        participant.on('track-muted', syncTracks as (track: unknown) => void);
-        participant.on('track-unmuted', syncTracks as (track: unknown) => void);
+      roomClient.on('room-joined', (data) => {
+        setLocalParticipant(data.participant);
+        setParticipants(data.otherParticipants);
       });
 
-      roomClient.on('local-participant-left', () => {
-        setLocalParticipant(null);
-        setLocalTracks([]);
-      });
-
-      roomClient.on('participant-joined', (participant: Participant) => {
+      roomClient.on('participant-joined', (participant) => {
         setParticipants((prev) => {
           // Check for duplicates by SID
           if (prev.some((p) => p.sid === participant.sid)) {
             return prev;
           }
-          return [...prev, participant as RemoteParticipant];
+          return [...prev, participant];
         });
       });
 
-      roomClient.on('participant-left', (participant: Participant) => {
-        setParticipants((prev) => prev.filter((p) => p.sid !== participant.sid));
+      roomClient.on('participant-left', (participantSid) => {
+        setParticipants((prev) => prev.filter((p) => p.sid !== participantSid));
       });
 
-      // Listen for track subscription events to update participants state
-      roomClient.on('track-subscribed', () => {
-        // Force re-render by updating participants with a new array reference
-        setParticipants((prev) => [...prev]);
-      });
-
-      roomClient.on('track-unsubscribed', () => {
-        // Force re-render by updating participants with a new array reference
-        setParticipants((prev) => [...prev]);
-      });
-
-      // Listen for track unpublish events to update participants state
-      // This is needed when a remote participant disables their camera/mic
-      roomClient.on('track-unpublished', () => {
-        // Force re-render by updating participants with a new array reference
-        setParticipants((prev) => [...prev]);
-      });
-
-      roomClient.on('error', (err: Error) => {
+      roomClient.on('error', (err) => {
         setError(err);
         onError?.(err);
       });
@@ -245,7 +209,6 @@ export function RoomProvider({
       setRoom(null);
       setConnectionState('disconnected' as ConnectionState);
       setLocalParticipant(null);
-      setLocalTracks([]);
       setParticipants([]);
       setError(null);
     }
@@ -280,7 +243,6 @@ export function RoomProvider({
     room,
     connectionState,
     localParticipant,
-    localTracks,
     participants,
     isConnecting,
     connect,

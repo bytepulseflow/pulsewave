@@ -3,13 +3,13 @@
  */
 
 import { useMemo } from 'react';
-import type { RemoteParticipant } from '../types';
+import type { ParticipantInfo } from '@bytepulse/pulsewave-shared';
 import { useRoomContext } from '../context';
 
 /**
  * useParticipants - Hook to access remote participants
  */
-export function useParticipants(): RemoteParticipant[] {
+export function useParticipants(): ParticipantInfo[] {
   const { participants } = useRoomContext();
   return participants;
 }
@@ -17,7 +17,7 @@ export function useParticipants(): RemoteParticipant[] {
 /**
  * useParticipant - Hook to access a specific remote participant by SID
  */
-export function useParticipant(sid: string): RemoteParticipant | undefined {
+export function useParticipant(sid: string): ParticipantInfo | undefined {
   const { participants } = useRoomContext();
   return useMemo(() => participants.find((p) => p.sid === sid), [participants, sid]);
 }
@@ -25,7 +25,7 @@ export function useParticipant(sid: string): RemoteParticipant | undefined {
 /**
  * useParticipantByIdentity - Hook to access a specific remote participant by identity
  */
-export function useParticipantByIdentity(identity: string): RemoteParticipant | undefined {
+export function useParticipantByIdentity(identity: string): ParticipantInfo | undefined {
   const { participants } = useRoomContext();
   return useMemo(() => participants.find((p) => p.identity === identity), [participants, identity]);
 }

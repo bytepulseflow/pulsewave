@@ -25,7 +25,7 @@ export function useCallActions() {
 
       try {
         logger.info('Initiating call', { targetParticipantSid, metadata });
-        await room.call(targetParticipantSid, metadata);
+        await room.startCall(targetParticipantSid, metadata);
         logger.info('Call initiated successfully', { targetParticipantSid });
       } catch (error) {
         logger.error('Error initiating call', { error, targetParticipantSid });
@@ -88,7 +88,7 @@ export function useCallActions() {
 
       try {
         logger.info('Ending call', { callId });
-        await room.rejectCall(callId, 'Call ended');
+        await room.endCall(callId);
         logger.info('Call ended successfully', { callId });
       } catch (error) {
         logger.error('Error ending call', { error, callId });

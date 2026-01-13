@@ -17,6 +17,20 @@ const mediasoupConfigSchema = z.object({
   rtcMaxPort: z.number().min(1024).max(65535).default(50000),
   logLevel: z.enum(['debug', 'warn', 'error']).default('error'),
   logTags: z.array(z.string()).default(['info', 'ice', 'dtls', 'rtp', 'srtp', 'rtcp']),
+  // Transport configuration
+  enableUdp: z.boolean().default(true),
+  enableTcp: z.boolean().default(true),
+  preferUdp: z.boolean().default(true),
+  enableSctp: z.boolean().default(false),
+  listenIps: z
+    .array(
+      z.object({
+        ip: z.string(),
+        announcedIp: z.string().optional(),
+      })
+    )
+    .default([{ ip: '0.0.0.0' }]),
+  initialAvailableOutgoingBitrate: z.number().default(600000),
 });
 
 /**
@@ -93,12 +107,13 @@ export function loadConfig(): Config {
     server: {
       port: process.env.PORT ? parseInt(process.env.PORT, 10) : undefined,
       host: process.env.HOST,
-      tls: process.env.TLS_CERT && process.env.TLS_KEY
-        ? {
-            cert: process.env.TLS_CERT,
-            key: process.env.TLS_KEY,
-          }
-        : undefined,
+      tls:
+        process.env.TLS_CERT && process.env.TLS_KEY
+          ? {
+              cert: process.env.TLS_CERT,
+              key: process.env.TLS_KEY,
+            }
+          : undefined,
     },
     mediasoup: {
       numWorkers: process.env.MEDIASOUP_NUM_WORKERS
@@ -111,6 +126,16 @@ export function loadConfig(): Config {
         ? parseInt(process.env.MEDIASOUP_MAX_PORT, 10)
         : undefined,
       logLevel: process.env.MEDIASOUP_LOG_LEVEL as 'debug' | 'warn' | 'error',
+      enableUdp: process.env.MEDIASOUP_ENABLE_UDP !== 'false',
+      enableTcp: process.env.MEDIASOUP_ENABLE_TCP !== 'false',
+      preferUdp: process.env.MEDIASOUP_PREFER_UDP !== 'false',
+      enableSctp: process.env.MEDIASOUP_ENABLE_SCTP === 'true',
+      listenIps: process.env.MEDIASOUP_LISTEN_IPS
+        ? JSON.parse(process.env.MEDIASOUP_LISTEN_IPS)
+        : [{ ip: process.env.MEDIASOUP_LISTEN_IP || '0.0.0.0' }],
+      initialAvailableOutgoingBitrate: process.env.MEDIASOUP_INITIAL_BITRATE
+        ? parseInt(process.env.MEDIASOUP_INITIAL_BITRATE, 10)
+        : undefined,
     },
     redis: {
       host: process.env.REDIS_HOST,
@@ -124,9 +149,7 @@ export function loadConfig(): Config {
       apiSecret: process.env.API_SECRET,
       expiresIn: process.env.JWT_EXPIRES_IN,
     },
-    iceServers: process.env.ICE_SERVERS
-      ? JSON.parse(process.env.ICE_SERVERS)
-      : undefined,
+    iceServers: process.env.ICE_SERVERS ? JSON.parse(process.env.ICE_SERVERS) : undefined,
   });
 
   return config;
