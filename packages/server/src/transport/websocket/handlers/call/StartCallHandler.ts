@@ -22,10 +22,10 @@ export class StartCallHandler extends BaseHandler {
       return;
     }
 
-    // Validate target participant
-    const targetParticipant = appRoom.getParticipant(message.targetParticipantSid);
+    // Validate target participant by userId (identity)
+    const targetParticipant = appRoom.getParticipantByIdentity(message.targetUserId);
     if (!targetParticipant) {
-      this.sendError(context.ws, ErrorCode.NotFound, 'Target participant not found');
+      this.sendError(context.ws, ErrorCode.NotFound, 'Target user not found in room');
       return;
     }
 

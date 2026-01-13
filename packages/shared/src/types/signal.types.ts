@@ -45,7 +45,7 @@ export interface LeaveRoomIntent {
  */
 export interface StartCallIntent {
   type: 'start_call';
-  targetParticipantSid: string;
+  targetUserId: string;
   metadata?: Record<string, unknown>;
 }
 
@@ -621,7 +621,7 @@ export interface TrackUnmutedMessage {
  */
 export interface CallMessage {
   type: 'call';
-  targetParticipantSid: string;
+  targetUserId: string;
   metadata?: Record<string, unknown>;
 }
 
