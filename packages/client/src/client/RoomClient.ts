@@ -1,26 +1,18 @@
 /**
- * RoomClient - Main client class for connecting to a mediasoup room
+ * RoomClient - Public API facade for room operations
  *
- * This is the new RoomClient implementation that uses:
- * - Signaling Layer: Generic signaling with pluggable backends
- * - Adapter Layer: Translates signaling to mediasoup operations
- * - Session State Machine: Manages session states and reconnection
+ * This is the main entry point for the client SDK. It provides a simple, high-level API
+ * for interacting with rooms, calls, and media. Internally, it uses the services layer
+ * (RoomService, CallService) to orchestrate operations.
  *
  * This client is stateful and imperative (not React-aware).
  */
 
 import type { SignalingClient, SignalingClientOptions } from '../signaling/SignalingClient';
 import { SignalingClient as SignalingClientImpl } from '../signaling/SignalingClient';
-import type { MediasoupAdapter } from '../adapter/MediasoupAdapter';
-import { MediasoupAdapter as MediasoupAdapterImpl } from '../adapter/MediasoupAdapter';
-import type { RtpCapabilities } from '@bytepulse/pulsewave-shared';
-import type {
-  ClientIntent,
-  ServerResponse,
-  RoomInfo,
-  ParticipantInfo,
-  TrackInfo,
-} from '@bytepulse/pulsewave-shared';
+import type { RoomInfo, ParticipantInfo, TrackInfo } from '@bytepulse/pulsewave-shared';
+import { RoomService } from '../services/RoomService';
+import { CallService } from '../services/CallService';
 import { createModuleLogger } from '../utils/logger';
 
 const logger = createModuleLogger('room-client');
@@ -53,7 +45,7 @@ export interface RoomClientOptions {
 /**
  * Room events
  */
-export interface RoomEvents {
+export interface RoomClientEvents {
   /**
    * Connection state changed
    */
@@ -153,17 +145,14 @@ export interface RoomEvents {
   error: (error: Error) => void;
 }
 
-/**
- * RoomClient - Main RoomClient using the layered architecture
- */
 export class RoomClient {
   private signalingClient: SignalingClient;
-  private mediasoupAdapter: MediasoupAdapter | null = null;
-  private roomInfo: RoomInfo | null = null;
-  private localParticipant: ParticipantInfo | null = null;
-  private participants: Map<string, ParticipantInfo> = new Map();
-  private rtpCapabilities: RtpCapabilities | null = null;
-  private eventListeners: Map<keyof RoomEvents, Set<RoomEvents[keyof RoomEvents]>> = new Map();
+  private roomService: RoomService;
+  private callService: CallService;
+  private eventListeners: Map<
+    keyof RoomClientEvents,
+    Set<RoomClientEvents[keyof RoomClientEvents]>
+  > = new Map();
 
   constructor(private readonly options: RoomClientOptions) {
     // Initialize signaling client
@@ -172,8 +161,23 @@ export class RoomClient {
       transportImpl: options.signaling.transportImpl,
     });
 
-    // Setup signaling client listeners
-    this.setupSignalingListeners();
+    // Initialize room service
+    this.roomService = new RoomService({
+      signalingClient: this.signalingClient,
+      createMediaEngineAdapter: async (_rtpCapabilities) => {
+        // Media engine adapter will be created by the RoomService
+        // This is a placeholder - the actual implementation should be in RoomService
+        throw new Error('MediaEngineAdapter creation not implemented');
+      },
+    });
+
+    // Initialize call service
+    this.callService = new CallService({
+      roomService: this.roomService,
+    });
+
+    // Setup service listeners
+    this.setupServiceListeners();
   }
 
   /**
@@ -181,45 +185,15 @@ export class RoomClient {
    */
   async connect(): Promise<void> {
     logger.info('Connecting to room...');
-
-    try {
-      await this.signalingClient.connect();
-
-      // Send join room intent
-      this.sendIntent({
-        type: 'join_room',
-        room: this.options.room,
-        token: this.options.token,
-        metadata: this.options.metadata,
-      });
-
-      logger.info('Join room intent sent');
-    } catch (error) {
-      logger.error('Failed to connect:', { error });
-      this.emit('error', error as Error);
-      throw error;
-    }
+    await this.roomService.connect(this.options.room, this.options.token, this.options.metadata);
   }
 
   /**
    * Start a call (initiate media session)
    */
-  async startCall(targetParticipantSid: string, metadata?: Record<string, unknown>): Promise<void> {
-    logger.info('Starting call:', { targetParticipantSid });
-
-    // Initialize mediasoup adapter if not already initialized
-    if (!this.mediasoupAdapter) {
-      await this.initializeMediasoupAdapter();
-    }
-
-    // Send start call intent
-    this.sendIntent({
-      type: 'start_call',
-      targetParticipantSid,
-      metadata,
-    });
-
-    logger.info('Start call intent sent');
+  async startCall(targetUserId: string, metadata?: Record<string, unknown>): Promise<void> {
+    logger.info('Starting call:', { targetUserId });
+    await this.callService.startCall(targetUserId, metadata);
   }
 
   /**
@@ -227,20 +201,7 @@ export class RoomClient {
    */
   async acceptCall(callId: string, metadata?: Record<string, unknown>): Promise<void> {
     logger.info('Accepting call:', { callId });
-
-    // Initialize mediasoup adapter if not already initialized
-    if (!this.mediasoupAdapter) {
-      await this.initializeMediasoupAdapter();
-    }
-
-    // Send accept call intent
-    this.sendIntent({
-      type: 'accept_call',
-      callId,
-      metadata,
-    });
-
-    logger.info('Accept call intent sent');
+    await this.callService.acceptCall(callId, metadata);
   }
 
   /**
@@ -248,15 +209,7 @@ export class RoomClient {
    */
   async rejectCall(callId: string, reason?: string): Promise<void> {
     logger.info('Rejecting call:', { callId, reason });
-
-    // Send reject call intent
-    this.sendIntent({
-      type: 'reject_call',
-      callId,
-      reason,
-    });
-
-    logger.info('Reject call intent sent');
+    await this.callService.rejectCall(callId, reason);
   }
 
   /**
@@ -264,21 +217,7 @@ export class RoomClient {
    */
   async endCall(callId: string, reason?: string): Promise<void> {
     logger.info('Ending call:', { callId, reason });
-
-    // Send end call intent
-    this.sendIntent({
-      type: 'end_call',
-      callId,
-      reason,
-    });
-
-    // Close mediasoup adapter
-    if (this.mediasoupAdapter) {
-      this.mediasoupAdapter.close();
-      this.mediasoupAdapter = null;
-    }
-
-    logger.info('End call intent sent');
+    await this.callService.endCall(callId, reason);
   }
 
   /**
@@ -286,67 +225,32 @@ export class RoomClient {
    */
   async enableCamera(deviceId?: string): Promise<void> {
     logger.info('Enabling camera:', { deviceId });
-
-    // Ensure mediasoup adapter is initialized
-    if (!this.mediasoupAdapter) {
-      await this.initializeMediasoupAdapter();
-    }
-
-    // Send enable camera intent
-    this.sendIntent({
+    this.roomService.sendIntent({
       type: 'enable_camera',
       deviceId,
     });
-
-    logger.info('Enable camera intent sent');
   }
 
-  /**
-   * Disable camera
-   */
   async disableCamera(): Promise<void> {
     logger.info('Disabling camera');
-
-    // Send disable camera intent
-    this.sendIntent({
+    this.roomService.sendIntent({
       type: 'disable_camera',
     });
-
-    logger.info('Disable camera intent sent');
   }
 
-  /**
-   * Enable microphone
-   */
   async enableMicrophone(deviceId?: string): Promise<void> {
     logger.info('Enabling microphone:', { deviceId });
-
-    // Ensure mediasoup adapter is initialized
-    if (!this.mediasoupAdapter) {
-      await this.initializeMediasoupAdapter();
-    }
-
-    // Send enable microphone intent
-    this.sendIntent({
+    this.roomService.sendIntent({
       type: 'enable_microphone',
       deviceId,
     });
-
-    logger.info('Enable microphone intent sent');
   }
 
-  /**
-   * Disable microphone
-   */
   async disableMicrophone(): Promise<void> {
     logger.info('Disabling microphone');
-
-    // Send disable microphone intent
-    this.sendIntent({
+    this.roomService.sendIntent({
       type: 'disable_microphone',
     });
-
-    logger.info('Disable microphone intent sent');
   }
 
   /**
@@ -354,75 +258,43 @@ export class RoomClient {
    */
   async sendData(data: unknown, kind: 'reliable' | 'lossy' = 'reliable'): Promise<void> {
     logger.debug('Sending data:', { kind });
-
-    // Send send data intent
-    this.sendIntent({
+    this.roomService.sendIntent({
       type: 'send_data',
       payload: data,
       kind,
     });
-
-    logger.debug('Send data intent sent');
   }
 
-  /**
-   * Subscribe to participant's tracks
-   */
   async subscribeToParticipant(participantSid: string): Promise<void> {
     logger.info('Subscribing to participant:', { participantSid });
-
-    // Send subscribe to participant intent
-    this.sendIntent({
+    this.roomService.sendIntent({
       type: 'subscribe_to_participant',
       participantSid,
     });
-
-    logger.info('Subscribe to participant intent sent');
   }
 
-  /**
-   * Unsubscribe from participant's tracks
-   */
   async unsubscribeFromParticipant(participantSid: string): Promise<void> {
     logger.info('Unsubscribing from participant:', { participantSid });
-
-    // Send unsubscribe from participant intent
-    this.sendIntent({
+    this.roomService.sendIntent({
       type: 'unsubscribe_from_participant',
       participantSid,
     });
-
-    logger.info('Unsubscribe from participant intent sent');
   }
 
-  /**
-   * Mute track
-   */
   async muteTrack(trackSid: string): Promise<void> {
     logger.info('Muting track:', { trackSid });
-
-    // Send mute track intent
-    this.sendIntent({
+    this.roomService.sendIntent({
       type: 'mute_track',
       trackSid,
     });
-
-    logger.info('Mute track intent sent');
   }
 
-  /**
-   * Unmute track
-   */
   async unmuteTrack(trackSid: string): Promise<void> {
     logger.info('Unmuting track:', { trackSid });
-
-    // Send unmute track intent
-    this.sendIntent({
+    this.roomService.sendIntent({
       type: 'unmute_track',
       trackSid,
     });
-
-    logger.info('Unmute track intent sent');
   }
 
   /**
@@ -430,68 +302,33 @@ export class RoomClient {
    */
   async disconnect(): Promise<void> {
     logger.info('Disconnecting from room...');
-
-    // Close mediasoup adapter
-    if (this.mediasoupAdapter) {
-      this.mediasoupAdapter.close();
-      this.mediasoupAdapter = null;
-    }
-
-    // Send leave room intent
-    this.sendIntent({
-      type: 'leave_room',
-    });
-
-    // Disconnect signaling client
-    this.signalingClient.disconnect();
-
-    // Clear state
-    this.roomInfo = null;
-    this.localParticipant = null;
-    this.participants.clear();
-    this.rtpCapabilities = null;
-
-    logger.info('Disconnected');
+    await this.roomService.disconnect();
   }
 
   /**
    * Get room info
    */
   getRoomInfo(): RoomInfo | null {
-    return this.roomInfo;
+    return this.roomService.getRoomInfo();
   }
 
-  /**
-   * Get local participant
-   */
   getLocalParticipant(): ParticipantInfo | null {
-    return this.localParticipant;
+    return this.roomService.getLocalParticipantInfo();
   }
 
-  /**
-   * Get all participants
-   */
   getParticipants(): ParticipantInfo[] {
-    return Array.from(this.participants.values());
+    return this.roomService.getParticipants();
   }
 
-  /**
-   * Get participant by SID
-   */
   getParticipant(sid: string): ParticipantInfo | null {
-    return this.participants.get(sid) ?? null;
+    return this.roomService.getParticipant(sid);
   }
 
-  /**
-   * Get mediasoup adapter (for advanced use cases)
-   */
-  getMediasoupAdapter(): MediasoupAdapter | null {
-    return this.mediasoupAdapter;
+  getMediaEngineAdapter() {
+    // For advanced use cases - return the adapter from room service
+    return this.roomService.getOrCreateMediaEngineAdapter().catch(() => null);
   }
 
-  /**
-   * Get signaling client (for advanced use cases)
-   */
   getSignalingClient(): SignalingClient {
     return this.signalingClient;
   }
@@ -499,7 +336,7 @@ export class RoomClient {
   /**
    * Add event listener
    */
-  on<K extends keyof RoomEvents>(event: K, listener: RoomEvents[K]): void {
+  on<K extends keyof RoomClientEvents>(event: K, listener: RoomClientEvents[K]): void {
     if (!this.eventListeners.has(event)) {
       this.eventListeners.set(event, new Set());
     }
@@ -511,7 +348,7 @@ export class RoomClient {
   /**
    * Remove event listener
    */
-  off<K extends keyof RoomEvents>(event: K, listener: RoomEvents[K]): void {
+  off<K extends keyof RoomClientEvents>(event: K, listener: RoomClientEvents[K]): void {
     (this.eventListeners.get(event) as Set<(data: unknown) => void>)?.delete(
       listener as (data: unknown) => void
     );
@@ -525,197 +362,59 @@ export class RoomClient {
   }
 
   /**
-   * Initialize mediasoup adapter
+   * Setup service listeners
    */
-  private async initializeMediasoupAdapter(): Promise<void> {
-    if (this.mediasoupAdapter) {
-      return;
-    }
-
-    if (!this.rtpCapabilities) {
-      throw new Error('RTP capabilities not available. Wait for room joined.');
-    }
-
-    logger.info('Initializing mediasoup adapter...');
-
-    this.mediasoupAdapter = new MediasoupAdapterImpl({
-      signalingClient: this.signalingClient,
-      rtpCapabilities: this.rtpCapabilities,
-      onStateChange: (state) => {
-        logger.debug('Mediasoup adapter state changed:', { state });
-      },
-      onError: (error) => {
-        logger.error('Mediasoup adapter error:', { error });
-        this.emit('error', error);
-      },
-      onTrackPublished: (producerId, trackSid) => {
-        logger.info('Track published:', { producerId, trackSid });
-      },
-      onTrackUnpublished: (trackSid) => {
-        logger.info('Track unpublished:', { trackSid });
-      },
-      onTrackSubscribed: (consumerId, trackSid) => {
-        logger.info('Track subscribed:', { consumerId, trackSid });
-      },
-      onTrackUnsubscribed: (trackSid) => {
-        logger.info('Track unsubscribed:', { trackSid });
-      },
-    });
-
-    await this.mediasoupAdapter.initialize();
-
-    logger.info('Mediasoup adapter initialized');
-  }
-
-  /**
-   * Setup signaling client listeners
-   */
-  private setupSignalingListeners(): void {
-    this.signalingClient.onStateChange((state) => {
-      logger.debug('Signaling state changed:', { state });
+  private setupServiceListeners(): void {
+    // Forward room service events
+    this.roomService.on('connection-state-changed', (state) => {
       this.emit('connection-state-changed', state);
     });
 
-    this.signalingClient.onError((error) => {
-      logger.error('Signaling error:', { error });
+    this.roomService.on('room-joined', (data) => {
+      this.emit('room-joined', data);
+    });
+
+    this.roomService.on('participant-joined', (participant) => {
+      this.emit('participant-joined', participant);
+    });
+
+    this.roomService.on('participant-left', (participantSid) => {
+      this.emit('participant-left', participantSid);
+    });
+
+    this.roomService.on('error', (error) => {
       this.emit('error', error);
     });
 
-    this.signalingClient.onMessage((message) => {
-      this.handleServerMessage(message as unknown as ServerResponse);
+    // Forward call service events
+    this.callService.on('call-received', (data) => {
+      this.emit('call-received', data);
     });
-  }
 
-  /**
-   * Handle server message
-   */
-  private handleServerMessage(message: ServerResponse): void {
-    logger.debug('Server message received:', { type: message.type });
+    this.callService.on('call-accepted', (data) => {
+      this.emit('call-accepted', data);
+    });
 
-    switch (message.type) {
-      case 'room_joined':
-        this.roomInfo = message.room;
-        this.localParticipant = message.participant;
-        message.otherParticipants.forEach((participant) => {
-          this.participants.set(participant.sid, participant);
-        });
-        this.emit('room-joined', {
-          room: message.room,
-          participant: message.participant,
-          otherParticipants: message.otherParticipants,
-        });
-        break;
+    this.callService.on('call-rejected', (data) => {
+      this.emit('call-rejected', data);
+    });
 
-      case 'participant_joined':
-        this.participants.set(message.participant.sid, message.participant);
-        this.emit('participant-joined', message.participant);
-        break;
+    this.callService.on('call-ended', (data) => {
+      this.emit('call-ended', data);
+    });
 
-      case 'participant_left':
-        this.participants.delete(message.participantSid);
-        this.emit('participant-left', message.participantSid);
-        break;
-
-      case 'call_received':
-        this.emit('call-received', {
-          callId: message.callId,
-          caller: message.caller,
-          metadata: message.metadata,
-        });
-        break;
-
-      case 'call_accepted':
-        this.emit('call-accepted', {
-          callId: message.callId,
-          participant: message.participant,
-        });
-        break;
-
-      case 'call_rejected':
-        this.emit('call-rejected', {
-          callId: message.callId,
-          participant: message.participant,
-          reason: message.reason,
-        });
-        break;
-
-      case 'call_ended':
-        this.emit('call-ended', {
-          callId: message.callId,
-          reason: message.reason,
-        });
-        break;
-
-      case 'track_published':
-        this.emit('track-published', {
-          participantSid: message.participantSid,
-          track: message.track,
-        });
-        break;
-
-      case 'track_unpublished':
-        this.emit('track-unpublished', {
-          participantSid: message.participantSid,
-          trackSid: message.trackSid,
-        });
-        break;
-
-      case 'track_subscribed':
-        this.emit('track-subscribed', {
-          participantSid: message.participantSid,
-          track: message.track,
-        });
-        break;
-
-      case 'track_unsubscribed':
-        this.emit('track-unsubscribed', {
-          participantSid: message.participantSid,
-          trackSid: message.trackSid,
-        });
-        break;
-
-      case 'track_muted':
-        this.emit('track-muted', {
-          participantSid: message.participantSid,
-          trackSid: message.trackSid,
-        });
-        break;
-
-      case 'track_unmuted':
-        this.emit('track-unmuted', {
-          participantSid: message.participantSid,
-          trackSid: message.trackSid,
-        });
-        break;
-
-      case 'data_received':
-        this.emit('data-received', {
-          participantSid: message.participantSid,
-          payload: message.payload,
-          kind: message.kind,
-        });
-        break;
-
-      case 'error':
-        this.emit('error', new Error(message.error.message));
-        break;
-
-      default:
-        logger.warn('Unknown message type:', { type: (message as { type: string }).type });
-    }
-  }
-
-  /**
-   * Send intent to server
-   */
-  private sendIntent(intent: ClientIntent): void {
-    this.signalingClient.send(intent as unknown as Record<string, unknown>);
+    this.callService.on('error', (error) => {
+      this.emit('error', error);
+    });
   }
 
   /**
    * Emit event
    */
-  private emit<K extends keyof RoomEvents>(event: K, data: Parameters<RoomEvents[K]>[0]): void {
+  private emit<K extends keyof RoomClientEvents>(
+    event: K,
+    data: Parameters<RoomClientEvents[K]>[0]
+  ): void {
     (this.eventListeners.get(event) as Set<(data: unknown) => void>)?.forEach((listener) => {
       try {
         listener(data);

@@ -139,28 +139,38 @@ export function RoomProvider({
       setRoom(roomClient);
 
       // Set up event listeners
-      roomClient.on('connection-state-changed', (state) => {
-        // Map new connection states to ConnectionState
-        const mappedState =
-          state === 'connected'
-            ? ('connected' as ConnectionState)
-            : state === 'connecting'
-              ? ('connecting' as ConnectionState)
-              : state === 'disconnected'
-                ? ('disconnected' as ConnectionState)
-                : state === 'reconnecting'
-                  ? ('reconnecting' as ConnectionState)
-                  : ('disconnected' as ConnectionState);
-        setConnectionState(mappedState);
-        onConnectionStateChanged?.(mappedState);
-      });
+      roomClient.on(
+        'connection-state-changed',
+        (state: 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error') => {
+          // Map new connection states to ConnectionState
+          const mappedState =
+            state === 'connected'
+              ? ('connected' as ConnectionState)
+              : state === 'connecting'
+                ? ('connecting' as ConnectionState)
+                : state === 'disconnected'
+                  ? ('disconnected' as ConnectionState)
+                  : state === 'reconnecting'
+                    ? ('reconnecting' as ConnectionState)
+                    : ('disconnected' as ConnectionState);
+          setConnectionState(mappedState);
+          onConnectionStateChanged?.(mappedState);
+        }
+      );
 
-      roomClient.on('room-joined', (data) => {
-        setLocalParticipant(data.participant);
-        setParticipants(data.otherParticipants);
-      });
+      roomClient.on(
+        'room-joined',
+        (data: {
+          room: unknown;
+          participant: ParticipantInfo;
+          otherParticipants: ParticipantInfo[];
+        }) => {
+          setLocalParticipant(data.participant);
+          setParticipants(data.otherParticipants);
+        }
+      );
 
-      roomClient.on('participant-joined', (participant) => {
+      roomClient.on('participant-joined', (participant: ParticipantInfo) => {
         setParticipants((prev) => {
           // Check for duplicates by SID
           if (prev.some((p) => p.sid === participant.sid)) {
@@ -170,11 +180,11 @@ export function RoomProvider({
         });
       });
 
-      roomClient.on('participant-left', (participantSid) => {
+      roomClient.on('participant-left', (participantSid: string) => {
         setParticipants((prev) => prev.filter((p) => p.sid !== participantSid));
       });
 
-      roomClient.on('error', (err) => {
+      roomClient.on('error', (err: Error) => {
         setError(err);
         onError?.(err);
       });
@@ -222,7 +232,7 @@ export function RoomProvider({
 
     return () => {
       if (room) {
-        room.disconnect().catch((err) => {
+        room.disconnect().catch((err: unknown) => {
           const error = err as Error;
           logger.error('Error disconnecting on unmount:', { error: error.message });
         });

@@ -2,18 +2,18 @@
  * Client module exports
  */
 
-// New RoomClient (layered architecture)
+// RoomClient (layered architecture)
 export { RoomClient } from './RoomClient';
-export type { RoomClientOptions, RoomEvents } from './RoomClient';
+export type { RoomClientOptions, RoomClientEvents as RoomEvents } from './RoomClient';
 
-// Track and Participant classes (for advanced use cases)
-export { Track } from './Track';
-export { LocalTrack } from './LocalTrack';
-export { RemoteTrack } from './RemoteTrack';
+// Track and Participant classes (domain layer - moved to domain/ folder)
+export { Track } from '../domain/Track';
+export { LocalTrack } from '../domain/LocalTrack';
+export { RemoteTrack } from '../domain/RemoteTrack';
 export {
   TrackPublicationImpl,
   LocalTrackPublicationImpl,
   RemoteTrackPublicationImpl,
-} from './TrackPublication';
-export { ParticipantImpl, RemoteParticipantImpl } from './Participant';
-export { LocalParticipantImpl } from './LocalParticipant';
+} from '../domain/TrackPublication';
+export { ParticipantImpl, RemoteParticipantImpl } from '../domain/Participant';
+export { LocalParticipantImpl } from '../domain/LocalParticipant';

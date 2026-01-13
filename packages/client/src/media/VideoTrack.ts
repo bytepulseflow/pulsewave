@@ -4,7 +4,7 @@
 
 import type { TrackInfo } from '@bytepulse/pulsewave-shared';
 import { TrackKind, TrackSource } from '@bytepulse/pulsewave-shared';
-import { LocalTrack } from '../client/LocalTrack';
+import { LocalTrack } from '../domain/LocalTrack';
 
 /**
  * VideoTrack - Helper class for video track management

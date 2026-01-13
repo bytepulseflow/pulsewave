@@ -8,16 +8,16 @@ import './components/styles.css';
 // Export client classes
 export { RoomClient } from './client';
 export type { RoomClientOptions, RoomEvents } from './client';
-export { Track } from './client/Track';
-export { LocalTrack } from './client/LocalTrack';
-export { RemoteTrack } from './client/RemoteTrack';
+export { Track } from './domain/Track';
+export { LocalTrack } from './domain/LocalTrack';
+export { RemoteTrack } from './domain/RemoteTrack';
 export {
   TrackPublicationImpl,
   LocalTrackPublicationImpl,
   RemoteTrackPublicationImpl,
-} from './client/TrackPublication';
-export { ParticipantImpl, RemoteParticipantImpl } from './client/Participant';
-export { LocalParticipantImpl } from './client/LocalParticipant';
+} from './domain/TrackPublication';
+export { ParticipantImpl, RemoteParticipantImpl } from './domain/Participant';
+export { LocalParticipantImpl } from './domain/LocalParticipant';
 
 // Export signaling layer (new architecture)
 export * from './signaling';

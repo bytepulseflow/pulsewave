@@ -4,7 +4,7 @@
 
 import type { MediaTrackOptions } from '../types';
 import { TrackKind, TrackSource } from '@bytepulse/pulsewave-shared';
-import { LocalTrack } from '../client/LocalTrack';
+import { LocalTrack } from '../domain/LocalTrack';
 import type { TrackInfo } from '@bytepulse/pulsewave-shared';
 import { createModuleLogger } from '../utils/logger';
 

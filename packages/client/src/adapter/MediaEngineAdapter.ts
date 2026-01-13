@@ -1,27 +1,27 @@
 /**
- * MediasoupAdapter - Adapter layer that translates signaling to mediasoup operations
+ * MediaEngineAdapter - Adapter layer that translates signaling to media engine operations
  *
- * This is the ONLY place that touches mediasoup APIs. It:
- * - Translates intent-based signaling messages to mediasoup operations
+ * This is the ONLY place that touches media engine APIs (mediasoup). It:
+ * - Translates intent-based signaling messages to media engine operations
  * - Owns reconnection logic
  * - Owns transport lifecycle
  * - Is stateful and imperative (not React-aware)
- * - Hides all mediasoup concepts from upper layers
+ * - Hides all media engine concepts from upper layers
  */
 
 import type { SignalingClient } from '../signaling/SignalingClient';
 import type { RtpCapabilities, DataChannelKind } from '@bytepulse/pulsewave-shared';
 import { WebRTCManager } from '../webrtc/WebRTCManager';
 import type { types } from 'mediasoup-client';
-import { SessionStateMachine, SessionState, type StateTransitionEvent } from '../core';
+import { SessionStateMachine, SessionState } from '../core';
 import { createModuleLogger } from '../utils/logger';
 
-const logger = createModuleLogger('mediasoup-adapter');
+const logger = createModuleLogger('media-engine-adapter');
 
 /**
- * Mediasoup adapter options
+ * Media engine adapter options
  */
-export interface MediasoupAdapterOptions {
+export interface MediaEngineAdapterOptions {
   /**
    * Signaling client for communication
    */
@@ -74,9 +74,9 @@ export interface MediasoupAdapterOptions {
 }
 
 /**
- * MediasoupAdapter - Adapter layer that translates signaling to mediasoup operations
+ * MediaEngineAdapter - Adapter layer that translates signaling to media engine operations
  */
-export class MediasoupAdapter {
+export class MediaEngineAdapter {
   private webRTCManager: WebRTCManager | null = null;
   private stateMachine: SessionStateMachine;
   private messageHandlers: Set<(data: unknown) => void> = new Set();
@@ -85,15 +85,13 @@ export class MediasoupAdapter {
   private dataProducers: Map<string, types.DataProducer> = new Map();
   private dataConsumers: Map<string, types.DataConsumer> = new Map();
 
-  constructor(private readonly options: MediasoupAdapterOptions) {
+  constructor(private readonly options: MediaEngineAdapterOptions) {
     // Initialize state machine
     this.stateMachine = new SessionStateMachine();
-    this.stateMachine.onTransition(
-      (from: SessionState, to: SessionState, event: StateTransitionEvent) => {
-        logger.debug(`State transition: ${from} -> ${to} (${event})`);
-        this.options.onStateChange?.(to);
-      }
-    );
+    this.stateMachine.onTransition((from, to, event) => {
+      logger.debug(`State transition: ${from} -> ${to} (${event})`);
+      this.options.onStateChange?.(to);
+    });
 
     // Wire up signaling client
     this.setupSignalingClient();
@@ -133,7 +131,7 @@ export class MediasoupAdapter {
       await this.webRTCManager.createRecvTransport();
 
       this.stateMachine.transition('joined');
-      logger.info('Mediasoup adapter initialized');
+      logger.info('Media engine adapter initialized');
     } catch (error) {
       this.stateMachine.transition('disconnect');
       this.options.onError?.(error as Error);
@@ -198,7 +196,7 @@ export class MediasoupAdapter {
     }
 
     this.messageHandlers.clear();
-    logger.info('Mediasoup adapter closed');
+    logger.info('Media engine adapter closed');
   }
 
   /**

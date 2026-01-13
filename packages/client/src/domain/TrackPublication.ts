@@ -20,8 +20,8 @@ export class TrackPublicationImpl implements TrackPublication {
   public readonly kind: TrackKind;
   public readonly name: string;
   public readonly source: TrackSource;
-  public muted: boolean;
-  public subscribed: boolean;
+  muted: boolean;
+  subscribed: boolean;
   public readonly simulcast: boolean;
 
   constructor(info: TrackInfo, name: string) {

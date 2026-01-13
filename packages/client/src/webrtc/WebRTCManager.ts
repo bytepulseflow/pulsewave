@@ -59,8 +59,8 @@ interface MediasoupIceCandidate {
   ip: string;
   protocol: 'udp' | 'tcp';
   port: number;
-  type: 'host';
-  tcpType?: 'passive';
+  type: 'host' | 'srflx' | 'prflx' | 'relay';
+  tcpType?: 'passive' | 'active' | 'so';
   address: string;
 }
 
