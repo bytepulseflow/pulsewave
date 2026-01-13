@@ -15,6 +15,7 @@ interface AudioTrackProps {
  */
 export function AudioTrack({ track, onAudioElement }: AudioTrackProps): JSX.Element | null {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     const audioElement = audioRef.current;
@@ -29,11 +30,21 @@ export function AudioTrack({ track, onAudioElement }: AudioTrackProps): JSX.Elem
 
     const stream = new MediaStream();
     stream.addTrack(track.mediaTrack);
+    streamRef.current = stream;
 
     audioElement.srcObject = stream;
 
     return () => {
+      // Clear srcObject
       audioElement.srcObject = null;
+
+      // Stop all tracks in the stream to release resources
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((mediaTrack) => {
+          mediaTrack.stop();
+        });
+        streamRef.current = null;
+      }
     };
   }, [track]);
 

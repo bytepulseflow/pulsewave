@@ -24,6 +24,7 @@ export function VideoTrack({
   onVideoElement,
 }: VideoTrackProps): JSX.Element | null {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
 
@@ -41,6 +42,7 @@ export function VideoTrack({
 
     const stream = new MediaStream();
     stream.addTrack(track.mediaTrack);
+    streamRef.current = stream;
 
     videoElement.srcObject = stream;
     videoElement.muted = muted;
@@ -64,7 +66,18 @@ export function VideoTrack({
     return () => {
       videoElement.removeEventListener('loadedmetadata', onLoadedMetadata);
       videoElement.removeEventListener('error', onError);
+
+      // Clear srcObject
       videoElement.srcObject = null;
+
+      // Stop all tracks in the stream to release resources
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((mediaTrack) => {
+          mediaTrack.stop();
+        });
+        streamRef.current = null;
+      }
+
       setIsLoaded(false);
       setHasError(false);
     };

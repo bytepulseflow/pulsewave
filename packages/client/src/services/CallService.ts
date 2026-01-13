@@ -7,7 +7,8 @@
 
 import type { RoomService } from './RoomService';
 import type { ServerResponse, ParticipantInfo } from '@bytepulse/pulsewave-shared';
-import { createModuleLogger, EventEmitter } from '../utils';
+import { createModuleLogger, EventEmitter, classifyError, ErrorType } from '../utils';
+import { getGlobalTelemetry, TelemetryEventType } from '../telemetry';
 
 const logger = createModuleLogger('call-service');
 
@@ -64,6 +65,7 @@ export interface CallServiceOptions {
  */
 export class CallService extends EventEmitter<CallServiceEvents> {
   private activeCallId: string | null = null;
+  private telemetry = getGlobalTelemetry();
 
   constructor(private readonly options: CallServiceOptions) {
     super({ name: 'CallService' });
@@ -75,18 +77,34 @@ export class CallService extends EventEmitter<CallServiceEvents> {
    */
   async startCall(targetUserId: string, metadata?: Record<string, unknown>): Promise<void> {
     logger.info('Starting call:', { targetUserId });
+    this.telemetry.info(TelemetryEventType.CALL_STARTED, { targetUserId });
 
-    // Ensure media engine adapter is initialized
-    await this.options.roomService.getOrCreateMediaEngineAdapter();
+    try {
+      // Ensure media engine adapter is initialized
+      await this.options.roomService.getOrCreateMediaEngineAdapter();
 
-    // Send start call intent
-    this.options.roomService.sendIntent({
-      type: 'start_call',
-      targetUserId,
-      metadata,
-    });
+      // Send start call intent
+      this.options.roomService.sendIntent({
+        type: 'start_call',
+        targetUserId,
+        metadata,
+      });
 
-    logger.info('Start call intent sent');
+      logger.info('Start call intent sent');
+    } catch (error) {
+      const err = error as Error;
+      const errorType = classifyError(err);
+
+      if (errorType === ErrorType.FATAL) {
+        logger.error('Fatal error starting call:', { error: err, errorType });
+      } else {
+        logger.warn('Error starting call:', { error: err, errorType });
+      }
+
+      this.emit('error', err);
+      this.telemetry.error(TelemetryEventType.CALL_ERROR, err, { targetUserId, errorType });
+      throw err;
+    }
   }
 
   /**
@@ -94,21 +112,37 @@ export class CallService extends EventEmitter<CallServiceEvents> {
    */
   async acceptCall(callId: string, metadata?: Record<string, unknown>): Promise<void> {
     logger.info('Accepting call:', { callId });
+    this.telemetry.info(TelemetryEventType.CALL_ACCEPTED, { callId });
 
-    // Ensure media engine adapter is initialized
-    await this.options.roomService.getOrCreateMediaEngineAdapter();
+    try {
+      // Ensure media engine adapter is initialized
+      await this.options.roomService.getOrCreateMediaEngineAdapter();
 
-    // Send accept call intent
-    this.options.roomService.sendIntent({
-      type: 'accept_call',
-      callId,
-      metadata,
-    });
+      // Send accept call intent
+      this.options.roomService.sendIntent({
+        type: 'accept_call',
+        callId,
+        metadata,
+      });
 
-    // Track active call
-    this.activeCallId = callId;
+      // Track active call
+      this.activeCallId = callId;
 
-    logger.info('Accept call intent sent');
+      logger.info('Accept call intent sent');
+    } catch (error) {
+      const err = error as Error;
+      const errorType = classifyError(err);
+
+      if (errorType === ErrorType.FATAL) {
+        logger.error('Fatal error accepting call:', { error: err, errorType });
+      } else {
+        logger.warn('Error accepting call:', { error: err, errorType });
+      }
+
+      this.emit('error', err);
+      this.telemetry.error(TelemetryEventType.CALL_ERROR, err, { callId, errorType });
+      throw err;
+    }
   }
 
   /**
@@ -116,15 +150,31 @@ export class CallService extends EventEmitter<CallServiceEvents> {
    */
   async rejectCall(callId: string, reason?: string): Promise<void> {
     logger.info('Rejecting call:', { callId, reason });
+    this.telemetry.info(TelemetryEventType.CALL_REJECTED, { callId, reason });
 
-    // Send reject call intent
-    this.options.roomService.sendIntent({
-      type: 'reject_call',
-      callId,
-      reason,
-    });
+    try {
+      // Send reject call intent
+      this.options.roomService.sendIntent({
+        type: 'reject_call',
+        callId,
+        reason,
+      });
 
-    logger.info('Reject call intent sent');
+      logger.info('Reject call intent sent');
+    } catch (error) {
+      const err = error as Error;
+      const errorType = classifyError(err);
+
+      if (errorType === ErrorType.FATAL) {
+        logger.error('Fatal error rejecting call:', { error: err, errorType });
+      } else {
+        logger.warn('Error rejecting call:', { error: err, errorType });
+      }
+
+      this.emit('error', err);
+      this.telemetry.error(TelemetryEventType.CALL_ERROR, err, { callId, errorType });
+      throw err;
+    }
   }
 
   /**
@@ -132,20 +182,36 @@ export class CallService extends EventEmitter<CallServiceEvents> {
    */
   async endCall(callId: string, reason?: string): Promise<void> {
     logger.info('Ending call:', { callId, reason });
+    this.telemetry.info(TelemetryEventType.CALL_ENDED, { callId, reason });
 
-    // Send end call intent
-    this.options.roomService.sendIntent({
-      type: 'end_call',
-      callId,
-      reason,
-    });
+    try {
+      // Send end call intent
+      this.options.roomService.sendIntent({
+        type: 'end_call',
+        callId,
+        reason,
+      });
 
-    // Clear active call
-    if (this.activeCallId === callId) {
-      this.activeCallId = null;
+      // Clear active call
+      if (this.activeCallId === callId) {
+        this.activeCallId = null;
+      }
+
+      logger.info('End call intent sent');
+    } catch (error) {
+      const err = error as Error;
+      const errorType = classifyError(err);
+
+      if (errorType === ErrorType.FATAL) {
+        logger.error('Fatal error ending call:', { error: err, errorType });
+      } else {
+        logger.warn('Error ending call:', { error: err, errorType });
+      }
+
+      this.emit('error', err);
+      this.telemetry.error(TelemetryEventType.CALL_ERROR, err, { callId, errorType });
+      throw err;
     }
-
-    logger.info('End call intent sent');
   }
 
   /**

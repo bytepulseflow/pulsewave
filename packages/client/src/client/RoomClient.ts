@@ -19,7 +19,7 @@ import type {
 } from '@bytepulse/pulsewave-shared';
 import { RoomService } from '../services/RoomService';
 import { CallService } from '../services/CallService';
-import { createModuleLogger } from '../utils/logger';
+import { createModuleLogger, withTimeout } from '../utils';
 import { EventEmitter } from '../utils';
 
 const logger = createModuleLogger('room-client');
@@ -47,6 +47,11 @@ export interface RoomClientOptions {
    * Metadata
    */
   metadata?: Record<string, unknown>;
+
+  /**
+   * Timeout for async operations in milliseconds (default: 30000ms)
+   */
+  timeout?: number;
 }
 
 /**
@@ -189,7 +194,12 @@ export class RoomClient extends EventEmitter<RoomClientEvents> {
    */
   async connect(): Promise<void> {
     logger.info('Connecting to room...');
-    await this.roomService.connect(this.options.room, this.options.token, this.options.metadata);
+    const timeout = this.options.timeout ?? 30000;
+
+    await withTimeout(
+      this.roomService.connect(this.options.room, this.options.token, this.options.metadata),
+      { timeout, message: 'Failed to connect to room' }
+    );
   }
 
   /**

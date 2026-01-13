@@ -16,7 +16,15 @@ import type {
 } from '@bytepulse/pulsewave-shared';
 import type { LocalParticipantImpl } from '../domain/LocalParticipant';
 import type { RemoteParticipantImpl } from '../domain/Participant';
-import { createModuleLogger, EventEmitter } from '../utils';
+import {
+  createModuleLogger,
+  EventEmitter,
+  withTimeout,
+  withRetry,
+  classifyError,
+  ErrorType,
+} from '../utils';
+import { getGlobalTelemetry, TelemetryEventType } from '../telemetry';
 
 const logger = createModuleLogger('room-service');
 
@@ -69,6 +77,11 @@ export interface RoomServiceOptions {
    * Media engine adapter factory
    */
   createMediaEngineAdapter: (rtpCapabilities: RtpCapabilities) => Promise<MediaEngineAdapter>;
+
+  /**
+   * Timeout for async operations in milliseconds (default: 30000ms)
+   */
+  timeout?: number;
 }
 
 /**
@@ -81,6 +94,7 @@ export class RoomService extends EventEmitter<RoomServiceEvents> {
   private mediaEngineAdapter: MediaEngineAdapter | null = null;
   private localParticipantImpl: LocalParticipantImpl | null = null;
   private remoteParticipants: Map<string, RemoteParticipantImpl> = new Map();
+  private telemetry = getGlobalTelemetry();
 
   constructor(private readonly options: RoomServiceOptions) {
     super({ name: 'RoomService' });
@@ -92,9 +106,26 @@ export class RoomService extends EventEmitter<RoomServiceEvents> {
    */
   async connect(room: string, token: string, metadata?: Record<string, unknown>): Promise<void> {
     logger.info('Connecting to room...', { room });
+    this.telemetry.debug(TelemetryEventType.CONNECTION_ATTEMPTED, { room });
+
+    const timeout = this.options.timeout ?? 30000;
+    const startTime = Date.now();
 
     try {
-      await this.options.signalingClient.connect();
+      // Connect with timeout and retry
+      await withRetry(
+        () =>
+          withTimeout(this.options.signalingClient.connect(), {
+            timeout,
+            message: 'Failed to connect to signaling server',
+          }),
+        {
+          maxAttempts: 3,
+          onRetry: (attempt, error) => {
+            logger.warn(`Retrying connection (attempt ${attempt}):`, { error });
+          },
+        }
+      );
 
       // Send join room intent
       this.sendIntent({
@@ -105,10 +136,37 @@ export class RoomService extends EventEmitter<RoomServiceEvents> {
       });
 
       logger.info('Join room intent sent');
+
+      const duration = Date.now() - startTime;
+      this.telemetry.info(TelemetryEventType.CONNECTION_SUCCESS, { room, duration });
     } catch (error) {
-      logger.error('Failed to connect:', { error });
-      this.emit('error', error as Error);
-      throw error;
+      const err = error as Error;
+      const errorType = classifyError(err);
+
+      logger.error('Failed to connect:', { error: err, errorType });
+
+      // Determine if error is recoverable or fatal
+      if (errorType === ErrorType.FATAL) {
+        logger.error('Fatal error encountered, cannot recover:', { error: err });
+        this.emit('error', err);
+        throw err;
+      } else if (errorType === ErrorType.TIMEOUT || errorType === ErrorType.NETWORK) {
+        logger.warn('Recoverable error encountered:', { error: err, errorType });
+        this.emit('error', err);
+        throw err;
+      } else {
+        logger.warn('Unknown error type:', { error: err, errorType });
+        this.emit('error', err);
+
+        const duration = Date.now() - startTime;
+        this.telemetry.error(TelemetryEventType.CONNECTION_FAILED, err, {
+          room,
+          duration,
+          errorType,
+        });
+
+        throw err;
+      }
     }
   }
 
@@ -117,6 +175,7 @@ export class RoomService extends EventEmitter<RoomServiceEvents> {
    */
   async disconnect(): Promise<void> {
     logger.info('Disconnecting from room...');
+    this.telemetry.info(TelemetryEventType.CONNECTION_CLOSED, { room: this.roomInfo?.name });
 
     // Close media engine adapter
     if (this.mediaEngineAdapter) {
@@ -216,7 +275,16 @@ export class RoomService extends EventEmitter<RoomServiceEvents> {
     });
 
     this.options.signalingClient.onError((error) => {
-      logger.error('Signaling error:', { error });
+      const errorType = classifyError(error);
+
+      if (errorType === ErrorType.FATAL) {
+        logger.error('Fatal signaling error:', { error, errorType });
+      } else if (errorType === ErrorType.TIMEOUT || errorType === ErrorType.NETWORK) {
+        logger.warn('Recoverable signaling error:', { error, errorType });
+      } else {
+        logger.error('Signaling error:', { error, errorType });
+      }
+
       this.emit('error', error);
     });
 
@@ -244,9 +312,19 @@ export class RoomService extends EventEmitter<RoomServiceEvents> {
         this.handleParticipantLeft(message);
         break;
 
-      case 'error':
-        this.emit('error', new Error(message.error.message));
+      case 'error': {
+        const serverError = new Error(message.error.message);
+        const errorType = classifyError(serverError);
+
+        if (errorType === ErrorType.FATAL) {
+          logger.error('Fatal server error:', { error: serverError, errorType });
+        } else {
+          logger.warn('Server error:', { error: serverError, errorType });
+        }
+
+        this.emit('error', serverError);
         break;
+      }
 
       case 'call_started':
       case 'call_received':
