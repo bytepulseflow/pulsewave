@@ -6,3 +6,5 @@
 
 export { RoomManager } from './RoomManager';
 export { CallManager } from './CallManager';
+export { NetworkQualityMonitor } from './NetworkQualityMonitor';
+export type { NetworkQualityMonitorOptions } from './NetworkQualityMonitor';

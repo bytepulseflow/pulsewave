@@ -26,3 +26,5 @@ export { useAudioAnalyzer, cleanupAllAudioAnalyzers } from './useAudioAnalyzer';
 export { useCalls } from './useCalls';
 export { useIncomingCall } from './useIncomingCall';
 export { useCallActions } from './useCallActions';
+export { useNetworkQuality, useConnectionQuality } from './useNetworkQuality';
+export { useOptimisticUpdates } from './useOptimisticUpdates';

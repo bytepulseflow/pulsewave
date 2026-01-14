@@ -10,6 +10,7 @@ export * from './types/signal.types';
 export * from './types/token.types';
 export * from './types/data-provider.types';
 export * from './types/adapter.types';
+export * from './types/network.types';
 
 // Re-export DataChannelKind explicitly to avoid ambiguity
 export { DataChannelKind } from './types/data-provider.types';

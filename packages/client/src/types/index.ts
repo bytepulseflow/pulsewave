@@ -371,6 +371,16 @@ export interface CallInfo {
  */
 export interface ParticipantEvents {
   /**
+   * Name changed
+   */
+  'name-changed': (name: string) => void;
+
+  /**
+   * State changed
+   */
+  'state-changed': (state: ConnectionState) => void;
+
+  /**
    * Metadata updated
    */
   'metadata-updated': (metadata: Record<string, unknown>) => void;

@@ -20,3 +20,11 @@ export {
 } from './resourceTracker';
 export { ResourceType } from './resourceTracker';
 export type { TrackedResource } from './resourceTracker';
+
+export {
+  reconcileParticipantState,
+  mergeServerState,
+  generateReconciliationReport,
+  reconcileWithStrategy,
+} from './stateReconciliation';
+export type { ReconciliationResult, ReconciliationStrategy } from './stateReconciliation';

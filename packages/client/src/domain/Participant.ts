@@ -91,10 +91,25 @@ export class ParticipantImpl implements Participant {
    * Update participant info
    */
   updateInfo(info: ParticipantInfo): void {
+    const oldName = this.name;
+    const oldState = this.state;
+    const oldMetadata = this.metadata;
+
     this.info = info;
     this.name = info.name || info.identity;
     this.state = info.state;
     this.metadata = info.metadata || {};
+
+    // Emit events for state changes
+    if (oldName !== this.name) {
+      this.emit('name-changed', this.name);
+    }
+    if (oldState !== this.state) {
+      this.emit('state-changed', this.state);
+    }
+    if (JSON.stringify(oldMetadata) !== JSON.stringify(this.metadata)) {
+      this.emit('metadata-updated', this.metadata);
+    }
 
     // First, remove tracks that no longer exist in info.tracks
     const currentTrackSids = new Set(info.tracks.map((t) => t.sid));

@@ -260,9 +260,24 @@ export class LocalParticipantImpl implements LocalParticipant {
    * Update participant info
    */
   updateInfo(info: ParticipantInfo): void {
+    const oldName = this.name;
+    const oldState = this.state;
+    const oldMetadata = this.metadata;
+
     this.name = info.name || info.identity;
     this.state = info.state;
     this.metadata = info.metadata || {};
+
+    // Emit events for state changes
+    if (oldName !== this.name) {
+      this.emit('name-changed', this.name);
+    }
+    if (oldState !== this.state) {
+      this.emit('state-changed', this.state);
+    }
+    if (JSON.stringify(oldMetadata) !== JSON.stringify(this.metadata)) {
+      this.emit('metadata-updated', this.metadata);
+    }
 
     // Update tracks
     info.tracks.forEach((trackInfo) => {
