@@ -24,6 +24,22 @@ import type { ServerResponse } from '@bytepulse/pulsewave-shared';
 const logger = createModuleLogger('websocket');
 
 /**
+ * Broadcast delivery statistics
+ */
+export interface BroadcastResult {
+  totalRecipients: number;
+  successfulDeliveries: number;
+  failedDeliveries: number;
+  skippedDeliveries: number;
+  failureRate: number;
+  failures: Array<{
+    participantSid: string;
+    socketId: string;
+    reason: string;
+  }>;
+}
+
+/**
  * WebSocketServer class
  *
  * Manages WebSocket connections and delegates message handling to registered handlers.
@@ -41,6 +57,12 @@ export class WebSocketServer {
   private connections: Map<string, WebSocketConnection>;
   // Rate limiting
   private rateLimiter: RateLimiter;
+  // Broadcast metrics
+  private broadcastMetrics: {
+    totalBroadcasts: number;
+    totalDeliveries: number;
+    totalFailures: number;
+  };
 
   constructor(
     httpServer: HTTPServer,
@@ -59,6 +81,13 @@ export class WebSocketServer {
 
     // Initialize rate limiter
     this.rateLimiter = createDefaultRateLimiter();
+
+    // Initialize broadcast metrics
+    this.broadcastMetrics = {
+      totalBroadcasts: 0,
+      totalDeliveries: 0,
+      totalFailures: 0,
+    };
 
     this.wss = new WSServer({ server: httpServer });
 
@@ -258,18 +287,129 @@ export class WebSocketServer {
 
   /**
    * Broadcast message to all participants in a room
+   * Returns delivery statistics for monitoring
    */
   public broadcastToRoom(
     room: ApplicationRoom,
     message: ServerResponse,
     excludeSocketId?: string
-  ): void {
-    for (const participant of room.getParticipants()) {
+  ): BroadcastResult {
+    this.broadcastMetrics.totalBroadcasts++;
+
+    const result: BroadcastResult = {
+      totalRecipients: 0,
+      successfulDeliveries: 0,
+      failedDeliveries: 0,
+      skippedDeliveries: 0,
+      failureRate: 0,
+      failures: [],
+    };
+
+    const participants = room.getParticipants();
+    result.totalRecipients = participants.length;
+
+    for (const participant of participants) {
+      // Skip excluded socket
+      if (participant.socketId === excludeSocketId) {
+        result.skippedDeliveries++;
+        continue;
+      }
+
       const ws = this.connections.get(participant.socketId);
-      if (ws && ws.socketId !== excludeSocketId) {
-        this.send(ws, message);
+
+      if (!ws) {
+        // Connection not found - participant disconnected
+        result.failedDeliveries++;
+        result.failures.push({
+          participantSid: participant.sid,
+          socketId: participant.socketId,
+          reason: 'Connection not found',
+        });
+        continue;
+      }
+
+      // Check if connection is open
+      if (ws.readyState !== WebSocket.OPEN) {
+        result.failedDeliveries++;
+        result.failures.push({
+          participantSid: participant.sid,
+          socketId: participant.socketId,
+          reason: `Connection not ready (state: ${ws.readyState})`,
+        });
+        continue;
+      }
+
+      // Attempt to send message
+      try {
+        ws.send(JSON.stringify(message));
+        result.successfulDeliveries++;
+        this.broadcastMetrics.totalDeliveries++;
+      } catch (error) {
+        result.failedDeliveries++;
+        result.failures.push({
+          participantSid: participant.sid,
+          socketId: participant.socketId,
+          reason: error instanceof Error ? error.message : 'Unknown error',
+        });
+        this.broadcastMetrics.totalFailures++;
       }
     }
+
+    // Calculate failure rate
+    const deliveredCount = result.successfulDeliveries + result.failedDeliveries;
+    result.failureRate = deliveredCount > 0 ? result.failedDeliveries / deliveredCount : 0;
+
+    // Log if there were failures
+    if (result.failedDeliveries > 0) {
+      logger.warn(
+        {
+          roomSid: room.sid,
+          roomName: room.name,
+          result,
+        },
+        `Broadcast had ${result.failedDeliveries} failures out of ${result.totalRecipients} recipients`
+      );
+    }
+
+    // Alert on high failure rate (>10%)
+    if (result.failureRate > 0.1 && result.totalRecipients > 5) {
+      logger.error(
+        {
+          roomSid: room.sid,
+          roomName: room.name,
+          failureRate: result.failureRate,
+          failures: result.failures,
+          messageType: message.type,
+        },
+        `High broadcast failure rate: ${(result.failureRate * 100).toFixed(1)}%`
+      );
+    }
+
+    return result;
+  }
+
+  /**
+   * Get broadcast metrics
+   */
+  public getBroadcastMetrics() {
+    return {
+      ...this.broadcastMetrics,
+      overallFailureRate:
+        this.broadcastMetrics.totalDeliveries > 0
+          ? this.broadcastMetrics.totalFailures / this.broadcastMetrics.totalDeliveries
+          : 0,
+    };
+  }
+
+  /**
+   * Reset broadcast metrics
+   */
+  public resetBroadcastMetrics(): void {
+    this.broadcastMetrics = {
+      totalBroadcasts: 0,
+      totalDeliveries: 0,
+      totalFailures: 0,
+    };
   }
 
   /**
