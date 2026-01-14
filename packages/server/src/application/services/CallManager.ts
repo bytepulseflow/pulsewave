@@ -73,11 +73,22 @@ class ApplicationCallImpl implements ApplicationCall {
  */
 export class CallManager {
   private calls: Map<string, ApplicationCall>;
+  private activeCallsByParticipant: Map<string, string>; // participantSid -> callId
+  private callsBetweenParticipants: Map<string, string>; // "sid1-sid2" -> callId
   private options: CallManagerOptions;
 
   constructor(options: CallManagerOptions = {}) {
     this.calls = new Map();
+    this.activeCallsByParticipant = new Map();
+    this.callsBetweenParticipants = new Map();
     this.options = options;
+  }
+
+  /**
+   * Generate a key for calls between participants (sorted)
+   */
+  private getParticipantPairKey(sid1: string, sid2: string): string {
+    return [sid1, sid2].sort().join('-');
   }
 
   /**
@@ -127,6 +138,14 @@ export class CallManager {
     const call = new ApplicationCallImpl(callerSid, targetSid, metadata);
     this.calls.set(call.callId, call);
 
+    // Index active calls by participant
+    this.activeCallsByParticipant.set(callerSid, call.callId);
+    this.activeCallsByParticipant.set(targetSid, call.callId);
+
+    // Index calls between participants
+    const pairKey = this.getParticipantPairKey(callerSid, targetSid);
+    this.callsBetweenParticipants.set(pairKey, call.callId);
+
     logger.info(`Call started: ${call.callId} from ${callerSid} to ${targetSid}`);
 
     return {
@@ -155,6 +174,10 @@ export class CallManager {
     }
 
     call.setState('accepted');
+
+    // Update active call index (already indexed, just confirming it's active)
+    this.activeCallsByParticipant.set(call.callerSid, callId);
+    this.activeCallsByParticipant.set(call.targetSid, callId);
 
     logger.info(`Call accepted: ${callId}`);
 
@@ -186,6 +209,10 @@ export class CallManager {
     call.setState('rejected');
     call.end(reason);
 
+    // Remove from active call index
+    this.activeCallsByParticipant.delete(call.callerSid);
+    this.activeCallsByParticipant.delete(call.targetSid);
+
     logger.info(`Call rejected: ${callId} (${reason || 'no reason'})`);
 
     return {
@@ -214,6 +241,12 @@ export class CallManager {
     }
 
     call.end(reason);
+
+    // Remove from indexes
+    this.activeCallsByParticipant.delete(call.callerSid);
+    this.activeCallsByParticipant.delete(call.targetSid);
+    const pairKey = this.getParticipantPairKey(call.callerSid, call.targetSid);
+    this.callsBetweenParticipants.delete(pairKey);
 
     logger.info(`Call ended: ${callId} (${reason || 'no reason'})`);
 
@@ -259,23 +292,17 @@ export class CallManager {
    * Get active call for a participant
    */
   public getActiveCallForParticipant(participantSid: string): ApplicationCall | undefined {
-    return Array.from(this.calls.values()).find(
-      (call) =>
-        (call.callerSid === participantSid || call.targetSid === participantSid) &&
-        call.state !== 'ended' &&
-        call.state !== 'rejected'
-    );
+    const callId = this.activeCallsByParticipant.get(participantSid);
+    return callId ? this.calls.get(callId) : undefined;
   }
 
   /**
-   * Get call between two participants
+   * Get call between two participants (O(1) lookup)
    */
   public getCallBetweenParticipants(sid1: string, sid2: string): ApplicationCall | undefined {
-    return Array.from(this.calls.values()).find(
-      (call) =>
-        (call.callerSid === sid1 && call.targetSid === sid2) ||
-        (call.callerSid === sid2 && call.targetSid === sid1)
-    );
+    const pairKey = this.getParticipantPairKey(sid1, sid2);
+    const callId = this.callsBetweenParticipants.get(pairKey);
+    return callId ? this.calls.get(callId) : undefined;
   }
 
   /**
@@ -317,6 +344,8 @@ export class CallManager {
    */
   public clearAllCalls(): void {
     this.calls.clear();
+    this.activeCallsByParticipant.clear();
+    this.callsBetweenParticipants.clear();
     logger.info('Cleared all calls');
   }
 }

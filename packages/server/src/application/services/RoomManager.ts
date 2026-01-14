@@ -28,6 +28,7 @@ class ApplicationRoomImpl implements ApplicationRoom {
   public readonly creationTime: number;
   private _isActive: boolean;
   private participants: Map<string, ApplicationParticipant>;
+  private participantsByIdentity: Map<string, ApplicationParticipant>;
 
   constructor(name: string, metadata: Record<string, unknown> = {}, maxParticipants?: number) {
     this.sid = uuidv4();
@@ -37,6 +38,7 @@ class ApplicationRoomImpl implements ApplicationRoom {
     this.creationTime = Date.now();
     this._isActive = true;
     this.participants = new Map();
+    this.participantsByIdentity = new Map();
   }
 
   get isActive(): boolean {
@@ -52,12 +54,7 @@ class ApplicationRoomImpl implements ApplicationRoom {
   }
 
   public getParticipantByIdentity(identity: string): ApplicationParticipant | undefined {
-    for (const participant of this.participants.values()) {
-      if (participant.identity === identity) {
-        return participant;
-      }
-    }
-    return undefined;
+    return this.participantsByIdentity.get(identity);
   }
 
   public getParticipantCount(): number {
@@ -73,9 +70,14 @@ class ApplicationRoomImpl implements ApplicationRoom {
       throw new Error('Room is full');
     }
     this.participants.set(participant.sid, participant);
+    this.participantsByIdentity.set(participant.identity, participant);
   }
 
   public removeParticipant(sid: string): void {
+    const participant = this.participants.get(sid);
+    if (participant) {
+      this.participantsByIdentity.delete(participant.identity);
+    }
     this.participants.delete(sid);
   }
 
@@ -93,6 +95,7 @@ class ApplicationRoomImpl implements ApplicationRoom {
   public close(): void {
     this._isActive = false;
     this.participants.clear();
+    this.participantsByIdentity.clear();
   }
 }
 
@@ -101,10 +104,14 @@ class ApplicationRoomImpl implements ApplicationRoom {
  */
 export class RoomManager {
   private rooms: Map<string, ApplicationRoom>;
+  private roomsByName: Map<string, string>; // name -> sid
+  private participantIndex: Map<string, { roomSid: string; participantSid: string }>; // identity -> roomSid, participantSid
   private options: RoomManagerOptions;
 
   constructor(options: RoomManagerOptions = {}) {
     this.rooms = new Map();
+    this.roomsByName = new Map();
+    this.participantIndex = new Map();
     this.options = options;
   }
 
@@ -135,6 +142,7 @@ export class RoomManager {
 
     const room = new ApplicationRoomImpl(name, metadata, maxParticipants);
     this.rooms.set(room.sid, room);
+    this.roomsByName.set(name, room.sid);
 
     logger.info(`Created room: ${room.name} (${room.sid})`);
 
@@ -155,12 +163,8 @@ export class RoomManager {
    * Get a room by name
    */
   public getRoomByName(name: string): ApplicationRoom | undefined {
-    for (const room of this.rooms.values()) {
-      if (room.name === name) {
-        return room;
-      }
-    }
-    return undefined;
+    const sid = this.roomsByName.get(name);
+    return sid ? this.rooms.get(sid) : undefined;
   }
 
   /**
@@ -196,6 +200,11 @@ export class RoomManager {
     if (room) {
       room.close();
       this.rooms.delete(sid);
+      this.roomsByName.delete(room.name);
+      // Remove all participant entries for this room
+      for (const participant of room.getParticipants()) {
+        this.participantIndex.delete(participant.identity);
+      }
       logger.info(`Closed room: ${room.name} (${room.sid})`);
     }
   }
@@ -208,6 +217,8 @@ export class RoomManager {
       room.close();
     }
     this.rooms.clear();
+    this.roomsByName.clear();
+    this.participantIndex.clear();
     logger.info('Closed all rooms');
   }
 
@@ -225,16 +236,15 @@ export class RoomManager {
   }
 
   /**
-   * Get participant by identity across all rooms
+   * Get participant by identity across all rooms (O(1) lookup)
    */
   public getParticipantByIdentity(identity: string): ApplicationParticipant | undefined {
-    for (const room of this.rooms.values()) {
-      const participant = room.getParticipantByIdentity(identity);
-      if (participant) {
-        return participant;
-      }
+    const index = this.participantIndex.get(identity);
+    if (!index) {
+      return undefined;
     }
-    return undefined;
+    const room = this.rooms.get(index.roomSid);
+    return room?.getParticipant(index.participantSid);
   }
 
   /**
