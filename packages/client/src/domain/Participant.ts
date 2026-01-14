@@ -11,17 +11,16 @@ import type {
   TrackSubscribeOptions,
 } from '../types';
 import { RemoteTrackPublicationImpl } from './TrackPublication';
-import { createModuleLogger } from '../utils/logger';
+import { createModuleLogger, EventEmitter } from '../utils';
 
 const logger = createModuleLogger('participant');
 
 /**
  * Base Participant implementation
  */
-export class ParticipantImpl implements Participant {
+export class ParticipantImpl extends EventEmitter<ParticipantEvents> implements Participant {
   public readonly sid: string;
   public readonly identity: string;
-  public name: string;
   public state: ConnectionState;
   public metadata: Record<string, unknown>;
   public readonly isLocal: boolean = false;
@@ -31,14 +30,15 @@ export class ParticipantImpl implements Participant {
    */
   public readonly tracks: Map<string, RemoteTrackPublicationImpl> = new Map();
 
-  protected listeners: Map<keyof ParticipantEvents, Set<(data: unknown) => void>> = new Map();
   protected info: ParticipantInfo;
+  private _name: string;
 
   constructor(info: ParticipantInfo) {
+    super({ name: 'Participant' });
     this.info = info;
     this.sid = info.sid;
     this.identity = info.identity;
-    this.name = info.name || info.identity;
+    this._name = info.name || info.identity;
     this.state = info.state;
     this.metadata = info.metadata || {};
 
@@ -48,6 +48,20 @@ export class ParticipantImpl implements Participant {
       publication.setTrackSubscribedCallback(this.handleTrackSubscribed.bind(this));
       this.tracks.set(trackInfo.sid, publication);
     });
+  }
+
+  /**
+   * Get participant name
+   */
+  get name(): string {
+    return this._name;
+  }
+
+  /**
+   * Set participant name
+   */
+  set name(value: string) {
+    this._name = value;
   }
 
   /**
@@ -91,18 +105,18 @@ export class ParticipantImpl implements Participant {
    * Update participant info
    */
   updateInfo(info: ParticipantInfo): void {
-    const oldName = this.name;
+    const oldName = this._name;
     const oldState = this.state;
     const oldMetadata = this.metadata;
 
     this.info = info;
-    this.name = info.name || info.identity;
+    this._name = info.name || info.identity;
     this.state = info.state;
     this.metadata = info.metadata || {};
 
     // Emit events for state changes
-    if (oldName !== this.name) {
-      this.emit('name-changed', this.name);
+    if (oldName !== this._name) {
+      this.emit('name-changed', this._name);
     }
     if (oldState !== this.state) {
       this.emit('state-changed', this.state);
@@ -172,49 +186,10 @@ export class ParticipantImpl implements Participant {
   }
 
   /**
-   * Add event listener
-   */
-  on<K extends keyof ParticipantEvents>(event: K, listener: ParticipantEvents[K]): void {
-    if (!this.listeners.has(event)) {
-      this.listeners.set(event, new Set());
-    }
-    const listeners = this.listeners.get(event);
-    if (listeners) {
-      listeners.add(listener as (data: unknown) => void);
-    }
-  }
-
-  /**
-   * Remove event listener
-   */
-  off<K extends keyof ParticipantEvents>(event: K, listener: ParticipantEvents[K]): void {
-    const listeners = this.listeners.get(event);
-    if (listeners) {
-      listeners.delete(listener as (data: unknown) => void);
-    }
-  }
-
-  /**
-   * Emit event
-   */
-  protected emit<K extends keyof ParticipantEvents>(event: K, data?: unknown): void {
-    const listeners = this.listeners.get(event);
-    if (listeners) {
-      listeners.forEach((listener) => {
-        try {
-          listener(data);
-        } catch (error) {
-          logger.error(`Error in ${String(event)} listener`, { error });
-        }
-      });
-    }
-  }
-
-  /**
    * Remove all event listeners
    */
   removeAllListeners(): void {
-    this.listeners.clear();
+    super.removeAllListeners();
     this.tracks.forEach((track) => track.clearTrack());
     this.tracks.clear();
   }

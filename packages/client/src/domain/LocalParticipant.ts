@@ -13,17 +13,17 @@ import type {
 import { LocalTrack } from './LocalTrack';
 import { LocalTrackPublicationImpl } from './TrackPublication';
 import { MediaManager } from '../media/MediaManager';
-import { createModuleLogger } from '../utils/logger';
-
-const logger = createModuleLogger('local-participant');
+import { EventEmitter } from '../utils';
 
 /**
  * LocalParticipant implementation
  */
-export class LocalParticipantImpl implements LocalParticipant {
+export class LocalParticipantImpl
+  extends EventEmitter<LocalParticipantEvents>
+  implements LocalParticipant
+{
   public readonly sid: string;
   public readonly identity: string;
-  public name: string;
   public state: ConnectionState;
   public metadata: Record<string, unknown>;
   public readonly isLocal = true as const;
@@ -33,8 +33,6 @@ export class LocalParticipantImpl implements LocalParticipant {
    */
   public readonly tracks: Map<string, LocalTrackPublicationImpl> = new Map();
 
-  protected listeners: Map<keyof LocalParticipantEvents, Set<(data: unknown) => void>> = new Map();
-
   private publishCallback?: (track: LocalTrack, options?: TrackPublishOptions) => Promise<void>;
   private unpublishCallback?: (sid: string) => Promise<void>;
   private publishDataCallback?: (data: unknown, kind: 'reliable' | 'lossy') => Promise<void>;
@@ -43,11 +41,13 @@ export class LocalParticipantImpl implements LocalParticipant {
   private enableMicrophoneCallback?: (deviceId?: string) => Promise<void>;
   private disableMicrophoneCallback?: () => Promise<void>;
   private mediaManager: MediaManager;
+  private _name: string;
 
   constructor(info: ParticipantInfo) {
+    super({ name: 'LocalParticipant' });
     this.sid = info.sid;
     this.identity = info.identity;
-    this.name = info.name || info.identity;
+    this._name = info.name || info.identity;
     this.state = info.state;
     this.metadata = info.metadata || {};
     this.mediaManager = new MediaManager();
@@ -59,6 +59,20 @@ export class LocalParticipantImpl implements LocalParticipant {
       const publication = new LocalTrackPublicationImpl(trackInfo, trackInfo.sid, null);
       this.tracks.set(trackInfo.sid, publication);
     });
+  }
+
+  /**
+   * Get participant name
+   */
+  get name(): string {
+    return this._name;
+  }
+
+  /**
+   * Set participant name
+   */
+  set name(value: string) {
+    this._name = value;
   }
 
   /**
@@ -260,17 +274,17 @@ export class LocalParticipantImpl implements LocalParticipant {
    * Update participant info
    */
   updateInfo(info: ParticipantInfo): void {
-    const oldName = this.name;
+    const oldName = this._name;
     const oldState = this.state;
     const oldMetadata = this.metadata;
 
-    this.name = info.name || info.identity;
+    this._name = info.name || info.identity;
     this.state = info.state;
     this.metadata = info.metadata || {};
 
     // Emit events for state changes
-    if (oldName !== this.name) {
-      this.emit('name-changed', this.name);
+    if (oldName !== this._name) {
+      this.emit('name-changed', this._name);
     }
     if (oldState !== this.state) {
       this.emit('state-changed', this.state);
@@ -351,49 +365,10 @@ export class LocalParticipantImpl implements LocalParticipant {
   }
 
   /**
-   * Add event listener
-   */
-  on<K extends keyof LocalParticipantEvents>(event: K, listener: LocalParticipantEvents[K]): void {
-    if (!this.listeners.has(event)) {
-      this.listeners.set(event, new Set());
-    }
-    const listeners = this.listeners.get(event);
-    if (listeners) {
-      listeners.add(listener as (data: unknown) => void);
-    }
-  }
-
-  /**
-   * Remove event listener
-   */
-  off<K extends keyof LocalParticipantEvents>(event: K, listener: LocalParticipantEvents[K]): void {
-    const listeners = this.listeners.get(event);
-    if (listeners) {
-      listeners.delete(listener as (data: unknown) => void);
-    }
-  }
-
-  /**
-   * Emit event
-   */
-  protected emit<K extends keyof LocalParticipantEvents>(event: K, data?: unknown): void {
-    const listeners = this.listeners.get(event);
-    if (listeners) {
-      listeners.forEach((listener) => {
-        try {
-          listener(data);
-        } catch (error) {
-          logger.error(`Error in ${String(event)} listener`, { error });
-        }
-      });
-    }
-  }
-
-  /**
    * Remove all event listeners
    */
   removeAllListeners(): void {
-    this.listeners.clear();
+    super.removeAllListeners();
     this.mediaManager.stopAllTracks();
     this.tracks.forEach((track) => {
       if (track.track) {

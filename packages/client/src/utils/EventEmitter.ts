@@ -48,14 +48,14 @@ export class EventEmitter<Events> {
   private eventListeners: Map<keyof Events, Set<EventListener<unknown>>> = new Map();
   private maxListeners: number;
   private enableCleanupValidation: boolean;
-  private name: string;
+  private _emitterName: string;
   private listenerStack: Map<keyof Events, Set<EventListener<unknown>>> = new Map();
   private isDevelopment: boolean;
 
   constructor(options: EventEmitterOptions = {}) {
     this.maxListeners = options.maxListeners ?? 10;
     this.enableCleanupValidation = options.enableCleanupValidation ?? this.isDev();
-    this.name = options.name ?? 'EventEmitter';
+    this._emitterName = options.name ?? 'EventEmitter';
     this.isDevelopment = this.isDev();
 
     if (this.isDevelopment && this.enableCleanupValidation) {
@@ -86,7 +86,7 @@ export class EventEmitter<Events> {
     // Check max listeners
     if (listeners.size > this.maxListeners) {
       logger.warn(
-        `[${this.name}] Possible memory leak detected. ${listeners.size} listeners added for event "${String(event)}". Use off() or the returned cleanup function to remove listeners.`
+        `[${this._emitterName}] Possible memory leak detected. ${listeners.size} listeners added for event "${String(event)}". Use off() or the returned cleanup function to remove listeners.`
       );
     }
 
@@ -177,7 +177,9 @@ export class EventEmitter<Events> {
       try {
         (listener as EventListener<unknown>)(data);
       } catch (error) {
-        logger.error(`[${this.name}] Error in event listener for "${String(event)}":`, { error });
+        logger.error(`[${this._emitterName}] Error in event listener for "${String(event)}":`, {
+          error,
+        });
       }
     }
   }
@@ -229,14 +231,14 @@ export class EventEmitter<Events> {
       if (listeners.size > 0) {
         hasUncleanedListeners = true;
         logger.warn(
-          `[${this.name}] ${listeners.size} listener(s) not cleaned up for event "${String(event)}". This may cause memory leaks.`
+          `[${this._emitterName}] ${listeners.size} listener(s) not cleaned up for event "${String(event)}". This may cause memory leaks.`
         );
       }
     });
 
     if (hasUncleanedListeners) {
       logger.warn(
-        `[${this.name}] Some event listeners were not cleaned up. Ensure you call off() or use the cleanup function returned by on() when components unmount.`
+        `[${this._emitterName}] Some event listeners were not cleaned up. Ensure you call off() or use the cleanup function returned by on() when components unmount.`
       );
     }
   }
@@ -246,7 +248,7 @@ export class EventEmitter<Events> {
    */
   setMaxListeners(n: number): void {
     this.maxListeners = Math.max(0, n);
-    logger.debug(`[${this.name}] Max listeners set to ${n}`);
+    logger.debug(`[${this._emitterName}] Max listeners set to ${n}`);
   }
 
   /**
