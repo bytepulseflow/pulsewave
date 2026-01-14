@@ -9,6 +9,7 @@ import { BaseHandler } from './../BaseHandler';
 import type { HandlerContext } from '../types';
 import { createModuleLogger } from '../../../../utils/logger';
 import { ApplicationParticipant } from '../../../../application';
+import type { ParticipantInfo } from '@bytepulse/pulsewave-shared';
 
 const logger = createModuleLogger('handler:join-room');
 
@@ -90,8 +91,8 @@ export class JoinRoomHandler extends BaseHandler {
       participant: participant.getInfo(),
       otherParticipants: appRoom
         .getParticipants()
-        .filter((p: any) => p.sid !== participant.sid)
-        .map((p: any) => p.getInfo()),
+        .filter((p) => p.sid !== participant.sid)
+        .map((p): ParticipantInfo => p.getInfo()),
     });
 
     // Notify other participants using Application Layer

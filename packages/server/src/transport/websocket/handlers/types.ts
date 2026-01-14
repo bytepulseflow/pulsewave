@@ -9,6 +9,7 @@ import type { ClientIntent, ServerResponse } from '@bytepulse/pulsewave-shared';
 import type { RoomManager as ApplicationRoomManager } from '../../../application';
 import type { CallManager } from '../../../application';
 import type { AdapterManager } from '../../../adapter';
+import type { ApplicationRoom } from '../../../application/services/types';
 
 /**
  * Extended WebSocket connection with additional data
@@ -23,7 +24,7 @@ export interface WebSocketConnection extends WebSocket {
  * Broadcast helper function type
  */
 export type BroadcastFunction = (
-  room: any,
+  room: ApplicationRoom,
   message: ServerResponse,
   excludeSocketId?: string
 ) => void;

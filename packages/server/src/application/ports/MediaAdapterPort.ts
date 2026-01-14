@@ -6,7 +6,14 @@
  */
 
 import type { Router } from 'mediasoup/types';
-import type { ProducerOptions, ConsumerOptions } from '@bytepulse/pulsewave-shared';
+import type {
+  ProducerOptions,
+  ConsumerOptions,
+  IceParameters,
+  IceCandidate,
+  DtlsParameters,
+  RtpParameters,
+} from '@bytepulse/pulsewave-shared';
 
 /**
  * Media Adapter Port interface
@@ -23,9 +30,9 @@ export interface MediaAdapterPort {
    */
   createSendTransport(options: ProducerOptions): Promise<{
     id: string;
-    iceParameters: any;
-    iceCandidates: any[];
-    dtlsParameters: any;
+    iceParameters: IceParameters;
+    iceCandidates: IceCandidate[];
+    dtlsParameters: DtlsParameters;
   }>;
 
   /**
@@ -33,15 +40,15 @@ export interface MediaAdapterPort {
    */
   createRecvTransport(options: ConsumerOptions): Promise<{
     id: string;
-    iceParameters: any;
-    iceCandidates: any[];
-    dtlsParameters: any;
+    iceParameters: IceParameters;
+    iceCandidates: IceCandidate[];
+    dtlsParameters: DtlsParameters;
   }>;
 
   /**
    * Connect a transport
    */
-  connectTransport(transportId: string, dtlsParameters: any): Promise<void>;
+  connectTransport(transportId: string, dtlsParameters: DtlsParameters): Promise<void>;
 
   /**
    * Create a producer
@@ -49,7 +56,7 @@ export interface MediaAdapterPort {
   createProducer(
     transportId: string,
     kind: 'audio' | 'video',
-    rtpParameters: any
+    rtpParameters: RtpParameters
   ): Promise<{ id: string }>;
 
   /**
@@ -63,12 +70,12 @@ export interface MediaAdapterPort {
   createConsumer(
     transportId: string,
     producerId: string,
-    rtpCapabilities: any
+    rtpCapabilities: RtpParameters
   ): Promise<{
     id: string;
     producerId: string;
     kind: 'audio' | 'video';
-    rtpParameters: any;
+    rtpParameters: RtpParameters;
   }>;
 
   /**

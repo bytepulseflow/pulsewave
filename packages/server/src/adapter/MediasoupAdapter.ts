@@ -43,6 +43,7 @@ import type {
   DataConsumerInfo,
 } from './types';
 import { createModuleLogger } from '../utils/logger';
+import { withTimeout, DEFAULT_TIMEOUTS, getTimeout } from '../utils/timeout';
 
 const logger = createModuleLogger('adapter:mediasoup');
 
@@ -90,17 +91,29 @@ export class MediasoupAdapter implements MediaAdapter {
   }
 
   /**
+   * Get timeout value for an operation
+   */
+  private getTimeout(operation: keyof typeof DEFAULT_TIMEOUTS): number {
+    const envVar = process.env[`TIMEOUT_${operation.toUpperCase()}`];
+    return getTimeout(envVar, DEFAULT_TIMEOUTS[operation]);
+  }
+
+  /**
    * Create a WebRTC transport
    */
   public async createTransport(options: TransportOptions): Promise<TransportInfo> {
-    const transport = await this.router.createWebRtcTransport({
-      enableUdp: options.enableUdp ?? this.options.enableUdp ?? true,
-      enableTcp: options.enableTcp ?? this.options.enableTcp ?? true,
-      preferUdp: options.preferUdp ?? this.options.preferUdp ?? true,
-      enableSctp: options.enableSctp ?? this.options.enableSctp ?? false,
-      listenIps: this.options.listenIps,
-      initialAvailableOutgoingBitrate: this.options.initialAvailableOutgoingBitrate,
-    });
+    const transport = await withTimeout(
+      this.router.createWebRtcTransport({
+        enableUdp: options.enableUdp ?? this.options.enableUdp ?? true,
+        enableTcp: options.enableTcp ?? this.options.enableTcp ?? true,
+        preferUdp: options.preferUdp ?? this.options.preferUdp ?? true,
+        enableSctp: options.enableSctp ?? this.options.enableSctp ?? false,
+        listenIps: this.options.listenIps,
+        initialAvailableOutgoingBitrate: this.options.initialAvailableOutgoingBitrate,
+      }),
+      this.getTimeout('TRANSPORT_CREATE'),
+      'createTransport'
+    );
 
     this.transports.set(transport.id, transport);
 
@@ -140,7 +153,11 @@ export class MediasoupAdapter implements MediaAdapter {
       throw new Error(`Transport not found: ${transportId}`);
     }
 
-    await transport.connect({ dtlsParameters: dtlsParameters as MediasoupDtlsParameters });
+    await withTimeout(
+      transport.connect({ dtlsParameters: dtlsParameters as MediasoupDtlsParameters }),
+      this.getTimeout('TRANSPORT_CONNECT'),
+      'connectTransport'
+    );
     logger.debug(`Connected transport: ${transportId}`);
   }
 
@@ -156,12 +173,16 @@ export class MediasoupAdapter implements MediaAdapter {
       throw new Error(`Transport not found: ${transportId}`);
     }
 
-    const producer = await transport.produce({
-      kind: options.kind as 'audio' | 'video',
-      rtpParameters: options.rtpParameters as MediasoupRtpParameters,
-      paused: options.paused ?? false,
-      appData: options.appData, // Forward appData without orchestration
-    });
+    const producer = await withTimeout(
+      transport.produce({
+        kind: options.kind as 'audio' | 'video',
+        rtpParameters: options.rtpParameters as MediasoupRtpParameters,
+        paused: options.paused ?? false,
+        appData: options.appData, // Forward appData without orchestration
+      }),
+      this.getTimeout('PRODUCER_CREATE'),
+      'createProducer'
+    );
 
     this.producers.set(producer.id, producer);
 
@@ -222,12 +243,16 @@ export class MediasoupAdapter implements MediaAdapter {
       );
     }
 
-    const consumer = await transport.consume({
-      producerId: options.producerId,
-      rtpCapabilities: rtpCapabilities as MediasoupRtpCapabilities,
-      paused: options.paused ?? false,
-      appData: options.appData,
-    });
+    const consumer = await withTimeout(
+      transport.consume({
+        producerId: options.producerId,
+        rtpCapabilities: rtpCapabilities as MediasoupRtpCapabilities,
+        paused: options.paused ?? false,
+        appData: options.appData,
+      }),
+      this.getTimeout('CONSUMER_CREATE'),
+      'createConsumer'
+    );
 
     this.consumers.set(consumer.id, consumer);
 
@@ -276,7 +301,7 @@ export class MediasoupAdapter implements MediaAdapter {
       throw new Error(`Producer not found: ${producerId}`);
     }
 
-    await producer.pause();
+    await withTimeout(producer.pause(), this.getTimeout('PRODUCER_PAUSE'), 'pauseProducer');
     logger.debug(`Paused producer: ${producerId}`);
   }
 
@@ -289,7 +314,7 @@ export class MediasoupAdapter implements MediaAdapter {
       throw new Error(`Producer not found: ${producerId}`);
     }
 
-    await producer.resume();
+    await withTimeout(producer.resume(), this.getTimeout('PRODUCER_RESUME'), 'resumeProducer');
     logger.debug(`Resumed producer: ${producerId}`);
   }
 
@@ -302,7 +327,11 @@ export class MediasoupAdapter implements MediaAdapter {
       throw new Error(`Producer not found: ${producerId}`);
     }
 
-    await producer.close();
+    await withTimeout(
+      Promise.resolve(producer.close()),
+      this.getTimeout('PRODUCER_CLOSE'),
+      'closeProducer'
+    );
     this.producers.delete(producerId);
     logger.debug(`Closed producer: ${producerId}`);
   }
@@ -316,7 +345,7 @@ export class MediasoupAdapter implements MediaAdapter {
       throw new Error(`Consumer not found: ${consumerId}`);
     }
 
-    await consumer.pause();
+    await withTimeout(consumer.pause(), this.getTimeout('CONSUMER_PAUSE'), 'pauseConsumer');
     logger.debug(`Paused consumer: ${consumerId}`);
   }
 
@@ -329,7 +358,7 @@ export class MediasoupAdapter implements MediaAdapter {
       throw new Error(`Consumer not found: ${consumerId}`);
     }
 
-    await consumer.resume();
+    await withTimeout(consumer.resume(), this.getTimeout('CONSUMER_RESUME'), 'resumeConsumer');
     logger.debug(`Resumed consumer: ${consumerId}`);
   }
 
@@ -342,7 +371,11 @@ export class MediasoupAdapter implements MediaAdapter {
       throw new Error(`Consumer not found: ${consumerId}`);
     }
 
-    await consumer.close();
+    await withTimeout(
+      Promise.resolve(consumer.close()),
+      this.getTimeout('CONSUMER_CLOSE'),
+      'closeConsumer'
+    );
     this.consumers.delete(consumerId);
     logger.debug(`Closed consumer: ${consumerId}`);
   }
@@ -359,12 +392,16 @@ export class MediasoupAdapter implements MediaAdapter {
       throw new Error(`Transport not found: ${transportId}`);
     }
 
-    const dataProducer = await transport.produceData({
-      sctpStreamParameters: options.sctpStreamParameters as MediasoupSctpStreamParameters,
-      label: options.label,
-      protocol: options.protocol,
-      appData: options.appData,
-    });
+    const dataProducer = await withTimeout(
+      transport.produceData({
+        sctpStreamParameters: options.sctpStreamParameters as MediasoupSctpStreamParameters,
+        label: options.label,
+        protocol: options.protocol,
+        appData: options.appData,
+      }),
+      this.getTimeout('DATA_PRODUCER_CREATE'),
+      'createDataProducer'
+    );
 
     this.dataProducers.set(dataProducer.id, dataProducer);
 
@@ -410,10 +447,14 @@ export class MediasoupAdapter implements MediaAdapter {
       throw new Error(`Data producer not found: ${options.dataProducerId}`);
     }
 
-    const dataConsumer = await transport.consumeData({
-      dataProducerId: options.dataProducerId,
-      appData: options.appData,
-    });
+    const dataConsumer = await withTimeout(
+      transport.consumeData({
+        dataProducerId: options.dataProducerId,
+        appData: options.appData,
+      }),
+      this.getTimeout('DATA_CONSUMER_CREATE'),
+      'createDataConsumer'
+    );
 
     this.dataConsumers.set(dataConsumer.id, dataConsumer);
 
@@ -459,7 +500,11 @@ export class MediasoupAdapter implements MediaAdapter {
       throw new Error(`Data producer not found: ${dataProducerId}`);
     }
 
-    await dataProducer.close();
+    await withTimeout(
+      Promise.resolve(dataProducer.close()),
+      this.getTimeout('DATA_PRODUCER_CLOSE'),
+      'closeDataProducer'
+    );
     this.dataProducers.delete(dataProducerId);
     logger.debug(`Closed data producer: ${dataProducerId}`);
   }
@@ -473,7 +518,11 @@ export class MediasoupAdapter implements MediaAdapter {
       throw new Error(`Data consumer not found: ${dataConsumerId}`);
     }
 
-    await dataConsumer.close();
+    await withTimeout(
+      Promise.resolve(dataConsumer.close()),
+      this.getTimeout('DATA_CONSUMER_CLOSE'),
+      'closeDataConsumer'
+    );
     this.dataConsumers.delete(dataConsumerId);
     logger.debug(`Closed data consumer: ${dataConsumerId}`);
   }
@@ -572,7 +621,11 @@ export class MediasoupAdapter implements MediaAdapter {
       throw new Error(`Producer not found: ${producerId}`);
     }
 
-    const stats = await producer.getStats();
+    const stats = await withTimeout(
+      producer.getStats(),
+      this.getTimeout('STATS_GET'),
+      'getProducerStats'
+    );
     return stats as ProducerStat[];
   }
 
@@ -585,7 +638,11 @@ export class MediasoupAdapter implements MediaAdapter {
       throw new Error(`Consumer not found: ${consumerId}`);
     }
 
-    const stats = await consumer.getStats();
+    const stats = await withTimeout(
+      consumer.getStats(),
+      this.getTimeout('STATS_GET'),
+      'getConsumerStats'
+    );
     return stats as ConsumerStat[];
   }
 }

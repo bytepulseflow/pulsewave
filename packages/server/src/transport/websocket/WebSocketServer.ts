@@ -5,17 +5,20 @@
  */
 
 import { WebSocketServer as WSServer, WebSocket } from 'ws';
-import type { Server as HTTPServer } from 'http';
-import type { IncomingMessage } from 'http';
-import type { RedisManager } from '../../redis';
-import type { JwtConfig } from '../../config';
-import type { ClientIntent, ServerResponse } from '@bytepulse/pulsewave-shared';
-import { ErrorCode } from '@bytepulse/pulsewave-shared';
-import { handlerRegistry, type WebSocketConnection } from './handlers';
-import { createModuleLogger } from '../../utils/logger';
-import { RoomManager as ApplicationRoomManager } from '../../application';
-import { CallManager } from '../../application';
+
 import { AdapterManager } from '../../adapter';
+import { RoomManager as ApplicationRoomManager, CallManager } from '../../application';
+import { createModuleLogger } from '../../utils/logger';
+import { RateLimiter, createDefaultRateLimiter } from '../../utils/RateLimiter';
+
+import { handlerRegistry, type WebSocketConnection } from './handlers';
+import { validateClientIntent, formatZodError } from './handlers/validation';
+
+import type { ApplicationRoom } from '../../application/services/types';
+import type { IncomingMessage, Server as HTTPServer } from 'http';
+import type { JwtConfig } from '../../config';
+import type { RedisManager } from '../../redis';
+import type { ServerResponse } from '@bytepulse/pulsewave-shared';
 
 const logger = createModuleLogger('websocket');
 
@@ -35,6 +38,8 @@ export class WebSocketServer {
   private redisManager: RedisManager | null;
   private jwtConfig: JwtConfig;
   private connections: Map<string, WebSocketConnection>;
+  // Rate limiting
+  private rateLimiter: RateLimiter;
 
   constructor(
     httpServer: HTTPServer,
@@ -50,6 +55,9 @@ export class WebSocketServer {
     // Initialize Application Layer
     this.applicationRoomManager = new ApplicationRoomManager();
     this.callManager = new CallManager();
+
+    // Initialize rate limiter
+    this.rateLimiter = createDefaultRateLimiter();
 
     this.wss = new WSServer({ server: httpServer });
 
@@ -86,7 +94,27 @@ export class WebSocketServer {
    */
   private async handleMessage(ws: WebSocketConnection, data: Buffer): Promise<void> {
     try {
-      const message: ClientIntent = JSON.parse(data.toString());
+      // Check rate limit
+      const rateLimitCheck = this.rateLimiter.check(ws.socketId);
+      if (!rateLimitCheck.allowed) {
+        logger.warn(
+          `Rate limit exceeded for ${ws.socketId}, retry after ${rateLimitCheck.retryAfter}ms`
+        );
+        this.sendError(ws, 1, 'Rate limit exceeded');
+        return;
+      }
+
+      // Parse and validate message
+      const parsed = JSON.parse(data.toString());
+      const validation = validateClientIntent(parsed);
+
+      if (!validation.success) {
+        logger.warn(`Invalid message from ${ws.socketId}: ${formatZodError(validation.error)}`);
+        this.sendError(ws, 1, formatZodError(validation.error));
+        return;
+      }
+
+      const message = validation.data;
       logger.debug(`Received intent: ${message.type} from ${ws.socketId}`);
 
       // Create handler context with layered architecture
@@ -107,7 +135,7 @@ export class WebSocketServer {
       await handlerRegistry.handle(context, message);
     } catch (error) {
       logger.error({ error }, 'Error handling message');
-      this.sendError(ws, ErrorCode.Unknown, 'Failed to process message');
+      this.sendError(ws, 0, 'Failed to process message');
     }
   }
 
@@ -116,6 +144,9 @@ export class WebSocketServer {
    */
   private async handleClose(ws: WebSocketConnection): Promise<void> {
     logger.info(`WebSocket disconnected: ${ws.socketId}`);
+
+    // Clean up rate limiter data for this connection
+    this.rateLimiter.reset(ws.socketId);
 
     // Handle leave if participant was in a room
     if (ws.roomSid && ws.participantSid) {
@@ -157,7 +188,7 @@ export class WebSocketServer {
   /**
    * Send error to client
    */
-  public sendError(ws: WebSocketConnection, code: ErrorCode, message: string): void {
+  public sendError(ws: WebSocketConnection, code: number, message: string): void {
     this.send(ws, {
       type: 'error',
       error: {
@@ -170,7 +201,11 @@ export class WebSocketServer {
   /**
    * Broadcast message to all participants in a room
    */
-  public broadcastToRoom(room: any, message: ServerResponse, excludeSocketId?: string): void {
+  public broadcastToRoom(
+    room: ApplicationRoom,
+    message: ServerResponse,
+    excludeSocketId?: string
+  ): void {
     for (const participant of room.getParticipants()) {
       const ws = this.connections.get(participant.socketId);
       if (ws && ws.socketId !== excludeSocketId) {

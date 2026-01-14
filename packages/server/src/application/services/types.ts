@@ -5,6 +5,7 @@
  */
 
 import type { ApplicationParticipant } from '../domain';
+import type { RoomInfo } from '@bytepulse/pulsewave-shared';
 
 // Re-export ApplicationParticipant for use in services
 export type { ApplicationParticipant } from '../domain';
@@ -27,7 +28,7 @@ export interface ApplicationRoom {
   isFull(): boolean;
   addParticipant(participant: ApplicationParticipant): void;
   removeParticipant(sid: string): void;
-  getInfo(): any;
+  getInfo(): RoomInfo;
   close(): void;
 }
 
