@@ -44,6 +44,7 @@ import type {
 } from './types';
 import { createModuleLogger } from '../utils/logger';
 import { withTimeout, DEFAULT_TIMEOUTS, getTimeout } from '../utils/timeout';
+import { ResourceNotFoundError, MediaError } from '../domain';
 
 const logger = createModuleLogger('adapter:mediasoup');
 
@@ -364,7 +365,7 @@ export class MediasoupAdapter implements MediaAdapter {
   ): Promise<void> {
     const transport = this.transports.get(transportId);
     if (!transport) {
-      throw new Error(`Transport not found: ${transportId}`);
+      throw new ResourceNotFoundError('Transport', transportId);
     }
 
     await withTimeout(
@@ -384,7 +385,7 @@ export class MediasoupAdapter implements MediaAdapter {
   ): Promise<ProducerInfo> {
     const transport = this.transports.get(transportId);
     if (!transport) {
-      throw new Error(`Transport not found: ${transportId}`);
+      throw new ResourceNotFoundError('Transport', transportId);
     }
 
     const producer = await withTimeout(
@@ -436,12 +437,12 @@ export class MediasoupAdapter implements MediaAdapter {
   ): Promise<ConsumerInfo> {
     const transport = this.transports.get(transportId);
     if (!transport) {
-      throw new Error(`Transport not found: ${transportId}`);
+      throw new ResourceNotFoundError('Transport', transportId);
     }
 
     const producer = this.producers.get(options.producerId);
     if (!producer) {
-      throw new Error(`Producer not found: ${options.producerId}`);
+      throw new ResourceNotFoundError('Producer', options.producerId);
     }
 
     // Check if we can consume this producer
@@ -453,9 +454,9 @@ export class MediasoupAdapter implements MediaAdapter {
         rtpCapabilities: rtpCapabilities as MediasoupRtpCapabilities,
       })
     ) {
-      throw new Error(
-        `Cannot consume producer ${options.producerId} - codec mismatch or unsupported`
-      );
+      throw new MediaError('consume', 'Codec mismatch or unsupported', {
+        producerId: options.producerId,
+      });
     }
 
     const consumer = await withTimeout(
@@ -514,7 +515,7 @@ export class MediasoupAdapter implements MediaAdapter {
   public async pauseProducer(producerId: string): Promise<void> {
     const producer = this.producers.get(producerId);
     if (!producer) {
-      throw new Error(`Producer not found: ${producerId}`);
+      throw new ResourceNotFoundError('Producer', producerId);
     }
 
     await withTimeout(producer.pause(), this.getTimeout('PRODUCER_PAUSE'), 'pauseProducer');
@@ -527,7 +528,7 @@ export class MediasoupAdapter implements MediaAdapter {
   public async resumeProducer(producerId: string): Promise<void> {
     const producer = this.producers.get(producerId);
     if (!producer) {
-      throw new Error(`Producer not found: ${producerId}`);
+      throw new ResourceNotFoundError('Producer', producerId);
     }
 
     await withTimeout(producer.resume(), this.getTimeout('PRODUCER_RESUME'), 'resumeProducer');
@@ -540,7 +541,7 @@ export class MediasoupAdapter implements MediaAdapter {
   public async closeProducer(producerId: string): Promise<void> {
     const producer = this.producers.get(producerId);
     if (!producer) {
-      throw new Error(`Producer not found: ${producerId}`);
+      throw new ResourceNotFoundError('Producer', producerId);
     }
 
     await withTimeout(
@@ -558,7 +559,7 @@ export class MediasoupAdapter implements MediaAdapter {
   public async pauseConsumer(consumerId: string): Promise<void> {
     const consumer = this.consumers.get(consumerId);
     if (!consumer) {
-      throw new Error(`Consumer not found: ${consumerId}`);
+      throw new ResourceNotFoundError('Consumer', consumerId);
     }
 
     await withTimeout(consumer.pause(), this.getTimeout('CONSUMER_PAUSE'), 'pauseConsumer');
@@ -571,7 +572,7 @@ export class MediasoupAdapter implements MediaAdapter {
   public async resumeConsumer(consumerId: string): Promise<void> {
     const consumer = this.consumers.get(consumerId);
     if (!consumer) {
-      throw new Error(`Consumer not found: ${consumerId}`);
+      throw new ResourceNotFoundError('Consumer', consumerId);
     }
 
     await withTimeout(consumer.resume(), this.getTimeout('CONSUMER_RESUME'), 'resumeConsumer');
@@ -584,7 +585,7 @@ export class MediasoupAdapter implements MediaAdapter {
   public async closeConsumer(consumerId: string): Promise<void> {
     const consumer = this.consumers.get(consumerId);
     if (!consumer) {
-      throw new Error(`Consumer not found: ${consumerId}`);
+      throw new ResourceNotFoundError('Consumer', consumerId);
     }
 
     await withTimeout(
@@ -605,7 +606,7 @@ export class MediasoupAdapter implements MediaAdapter {
   ): Promise<DataProducerInfo> {
     const transport = this.transports.get(transportId);
     if (!transport) {
-      throw new Error(`Transport not found: ${transportId}`);
+      throw new ResourceNotFoundError('Transport', transportId);
     }
 
     const dataProducer = await withTimeout(
@@ -656,12 +657,12 @@ export class MediasoupAdapter implements MediaAdapter {
   ): Promise<DataConsumerInfo> {
     const transport = this.transports.get(transportId);
     if (!transport) {
-      throw new Error(`Transport not found: ${transportId}`);
+      throw new ResourceNotFoundError('Transport', transportId);
     }
 
     const dataProducer = this.dataProducers.get(options.dataProducerId);
     if (!dataProducer) {
-      throw new Error(`Data producer not found: ${options.dataProducerId}`);
+      throw new ResourceNotFoundError('DataProducer', options.dataProducerId);
     }
 
     const dataConsumer = await withTimeout(
@@ -715,7 +716,7 @@ export class MediasoupAdapter implements MediaAdapter {
   public async closeDataProducer(dataProducerId: string): Promise<void> {
     const dataProducer = this.dataProducers.get(dataProducerId);
     if (!dataProducer) {
-      throw new Error(`Data producer not found: ${dataProducerId}`);
+      throw new ResourceNotFoundError('DataProducer', dataProducerId);
     }
 
     await withTimeout(
@@ -733,7 +734,7 @@ export class MediasoupAdapter implements MediaAdapter {
   public async closeDataConsumer(dataConsumerId: string): Promise<void> {
     const dataConsumer = this.dataConsumers.get(dataConsumerId);
     if (!dataConsumer) {
-      throw new Error(`Data consumer not found: ${dataConsumerId}`);
+      throw new ResourceNotFoundError('DataConsumer', dataConsumerId);
     }
 
     await withTimeout(
@@ -763,7 +764,7 @@ export class MediasoupAdapter implements MediaAdapter {
   public async closeTransport(transportId: string): Promise<void> {
     const transport = this.transports.get(transportId);
     if (!transport) {
-      throw new Error(`Transport not found: ${transportId}`);
+      throw new ResourceNotFoundError('Transport', transportId);
     }
 
     // Close only producers belonging to this transport
@@ -844,7 +845,7 @@ export class MediasoupAdapter implements MediaAdapter {
   public async getProducerStats(producerId: string): Promise<ProducerStat[]> {
     const producer = this.producers.get(producerId);
     if (!producer) {
-      throw new Error(`Producer not found: ${producerId}`);
+      throw new ResourceNotFoundError('Producer', producerId);
     }
 
     const stats = await withTimeout(
@@ -861,7 +862,7 @@ export class MediasoupAdapter implements MediaAdapter {
   public async getConsumerStats(consumerId: string): Promise<ConsumerStat[]> {
     const consumer = this.consumers.get(consumerId);
     if (!consumer) {
-      throw new Error(`Consumer not found: ${consumerId}`);
+      throw new ResourceNotFoundError('Consumer', consumerId);
     }
 
     const stats = await withTimeout(

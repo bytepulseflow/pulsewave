@@ -8,6 +8,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { ApplicationCall, CallManagerOptions, CallResult, CallInfo } from './types';
 import { createModuleLogger } from '../../utils/logger';
+import { InvalidStateError } from '../../domain';
 
 const logger = createModuleLogger('application:call-manager');
 
@@ -53,6 +54,22 @@ class ApplicationCallImpl implements ApplicationCall {
   }
 
   public setState(state: 'pending' | 'accepted' | 'rejected' | 'ended'): void {
+    // Validate state transition
+    const validTransitions: Record<string, string[]> = {
+      pending: ['accepted', 'rejected', 'ended'],
+      accepted: ['ended'],
+      rejected: ['ended'],
+      ended: [],
+    };
+
+    const allowedStates = validTransitions[this._state];
+    if (!allowedStates.includes(state)) {
+      throw new InvalidStateError('setState', this._state, state, {
+        callId: this.callId,
+        attemptedState: state,
+      });
+    }
+
     this._state = state;
     if (state === 'ended' && !this._endTime) {
       this._endTime = Date.now();
@@ -146,11 +163,19 @@ export class CallManager {
     targetSid: string,
     metadata?: Record<string, unknown>
   ): CallResult {
-    // Check if caller and target are different
+    // Validate caller and target are different
     if (callerSid === targetSid) {
       return {
         success: false,
         error: 'Cannot call yourself',
+      };
+    }
+
+    // Validate SIDs are not empty
+    if (!callerSid || !targetSid) {
+      return {
+        success: false,
+        error: 'Caller and target SIDs are required',
       };
     }
 
@@ -205,6 +230,14 @@ export class CallManager {
    * Accept a call
    */
   public acceptCall(callId: string): CallResult {
+    // Validate callId
+    if (!callId) {
+      return {
+        success: false,
+        error: 'Call ID is required',
+      };
+    }
+
     const call = this.calls.get(callId);
     if (!call) {
       return {
@@ -238,6 +271,14 @@ export class CallManager {
    * Reject a call
    */
   public rejectCall(callId: string, reason?: string): CallResult {
+    // Validate callId
+    if (!callId) {
+      return {
+        success: false,
+        error: 'Call ID is required',
+      };
+    }
+
     const call = this.calls.get(callId);
     if (!call) {
       return {
@@ -272,6 +313,14 @@ export class CallManager {
    * End a call
    */
   public endCall(callId: string, reason?: string): CallResult {
+    // Validate callId
+    if (!callId) {
+      return {
+        success: false,
+        error: 'Call ID is required',
+      };
+    }
+
     const call = this.calls.get(callId);
     if (!call) {
       return {

@@ -14,6 +14,7 @@ import type {
   RoomCreationResult,
 } from './types';
 import { createModuleLogger } from '../../utils/logger';
+import { ResourceNotFoundError, ValidationError } from '../../domain';
 
 const logger = createModuleLogger('application:room-manager');
 
@@ -67,7 +68,12 @@ class ApplicationRoomImpl implements ApplicationRoom {
 
   public addParticipant(participant: ApplicationParticipant): void {
     if (this.isFull()) {
-      throw new Error('Room is full');
+      throw new ValidationError('room', 'Room is full', {
+        roomSid: this.sid,
+        roomName: this.name,
+        currentParticipants: this.participants.size,
+        maxParticipants: this.maxParticipants,
+      });
     }
     this.participants.set(participant.sid, participant);
     this.participantsByIdentity.set(participant.identity, participant);
@@ -123,6 +129,21 @@ export class RoomManager {
     metadata: Record<string, unknown> = {},
     maxParticipants?: number
   ): RoomCreationResult {
+    // Validate room name
+    if (!name || name.trim().length === 0) {
+      return {
+        success: false,
+        error: 'Room name cannot be empty',
+      };
+    }
+
+    if (name.length > 64) {
+      return {
+        success: false,
+        error: 'Room name cannot exceed 64 characters',
+      };
+    }
+
     // Check if room with same name exists
     const existingRoom = this.getRoomByName(name);
     if (existingRoom) {
@@ -197,16 +218,17 @@ export class RoomManager {
    */
   public closeRoom(sid: string): void {
     const room = this.rooms.get(sid);
-    if (room) {
-      room.close();
-      this.rooms.delete(sid);
-      this.roomsByName.delete(room.name);
-      // Remove all participant entries for this room
-      for (const participant of room.getParticipants()) {
-        this.participantIndex.delete(participant.identity);
-      }
-      logger.info(`Closed room: ${room.name} (${room.sid})`);
+    if (!room) {
+      throw new ResourceNotFoundError('Room', sid);
     }
+    room.close();
+    this.rooms.delete(sid);
+    this.roomsByName.delete(room.name);
+    // Remove all participant entries for this room
+    for (const participant of room.getParticipants()) {
+      this.participantIndex.delete(participant.identity);
+    }
+    logger.info(`Closed room: ${room.name} (${room.sid})`);
   }
 
   /**

@@ -10,6 +10,7 @@ import { AdapterManager } from '../../adapter';
 import { RoomManager as ApplicationRoomManager, CallManager } from '../../application';
 import { createModuleLogger } from '../../utils/logger';
 import { RateLimiter, createDefaultRateLimiter } from '../../utils/RateLimiter';
+import { toDomainError, RateLimitError } from '../../domain';
 
 import { handlerRegistry, type WebSocketConnection } from './handlers';
 import { validateClientIntent, formatZodError } from './handlers/validation';
@@ -17,7 +18,7 @@ import { validateClientIntent, formatZodError } from './handlers/validation';
 import type { ApplicationRoom } from '../../application/services/types';
 import type { IncomingMessage, Server as HTTPServer } from 'http';
 import type { JwtConfig } from '../../config';
-import type { RedisManager } from '../../redis';
+import type { StateStore } from '../../state';
 import type { ServerResponse } from '@bytepulse/pulsewave-shared';
 
 const logger = createModuleLogger('websocket');
@@ -35,7 +36,7 @@ export class WebSocketServer {
   // Adapter Layer
   private adapterManager: AdapterManager;
   // Other
-  private redisManager: RedisManager | null;
+  private stateStore: StateStore | null;
   private jwtConfig: JwtConfig;
   private connections: Map<string, WebSocketConnection>;
   // Rate limiting
@@ -43,11 +44,11 @@ export class WebSocketServer {
 
   constructor(
     httpServer: HTTPServer,
-    redisManager: RedisManager | null,
+    stateStore: StateStore | null,
     jwtConfig: JwtConfig,
     adapterManager: AdapterManager
   ) {
-    this.redisManager = redisManager;
+    this.stateStore = stateStore;
     this.jwtConfig = jwtConfig;
     this.adapterManager = adapterManager;
     this.connections = new Map();
@@ -100,7 +101,14 @@ export class WebSocketServer {
         logger.warn(
           `Rate limit exceeded for ${ws.socketId}, retry after ${rateLimitCheck.retryAfter}ms`
         );
-        this.sendError(ws, 1, 'Rate limit exceeded');
+        // Use RateLimitError for consistent error handling
+        const rateLimitError = new RateLimitError(
+          100, // Default limit from createDefaultRateLimiter
+          60 * 1000, // Default window from createDefaultRateLimiter
+          rateLimitCheck.retryAfter ?? 0,
+          { socketId: ws.socketId }
+        );
+        this.sendDomainError(ws, rateLimitError);
         return;
       }
 
@@ -125,7 +133,7 @@ export class WebSocketServer {
         callManager: this.callManager,
         // Adapter Layer
         adapterManager: this.adapterManager,
-        redisManager: this.redisManager,
+        stateStore: this.stateStore,
         jwtConfig: this.jwtConfig,
         connections: this.connections,
         broadcast: this.broadcastToRoom.bind(this),
@@ -134,8 +142,9 @@ export class WebSocketServer {
       // Handle message through registry
       await handlerRegistry.handle(context, message);
     } catch (error) {
-      logger.error({ error }, 'Error handling message');
-      this.sendError(ws, 0, 'Failed to process message');
+      const domainError = toDomainError(error);
+      logger.error({ error: domainError }, 'Error handling message');
+      this.sendDomainError(ws, domainError);
     }
   }
 
@@ -196,6 +205,55 @@ export class WebSocketServer {
         message,
       },
     });
+  }
+
+  /**
+   * Send domain error to client with proper error code mapping
+   */
+  private sendDomainError(ws: WebSocketConnection, error: ReturnType<typeof toDomainError>): void {
+    // Map domain error codes to numeric error codes
+    let errorCode = 0; // Default: Unknown error
+    switch (error.code) {
+      case 'RESOURCE_NOT_FOUND':
+        errorCode = 404;
+        break;
+      case 'RESOURCE_EXISTS':
+        errorCode = 409;
+        break;
+      case 'INVALID_STATE':
+        errorCode = 400;
+        break;
+      case 'VALIDATION_ERROR':
+        errorCode = 400;
+        break;
+      case 'RATE_LIMIT_EXCEEDED':
+        errorCode = 429;
+        break;
+      case 'AUTHENTICATION_FAILED':
+        errorCode = 401;
+        break;
+      case 'AUTHORIZATION_FAILED':
+        errorCode = 403;
+        break;
+      case 'TIMEOUT':
+        errorCode = 504;
+        break;
+      case 'CIRCUIT_BREAKER_OPEN':
+        errorCode = 503;
+        break;
+      case 'MEDIA_ERROR':
+        errorCode = 500;
+        break;
+      case 'NETWORK_ERROR':
+        errorCode = 502;
+        break;
+      case 'INTERNAL_ERROR':
+      default:
+        errorCode = 500;
+        break;
+    }
+
+    this.sendError(ws, errorCode, error.message);
   }
 
   /**

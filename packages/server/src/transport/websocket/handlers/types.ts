@@ -3,11 +3,10 @@
  */
 
 import type { WebSocket } from 'ws';
-import type { RedisManager } from '../../../redis';
+import type { StateStore } from '../../../state';
 import type { JwtConfig } from '../../../config';
 import type { ClientIntent, ServerResponse } from '@bytepulse/pulsewave-shared';
-import type { RoomManager as ApplicationRoomManager } from '../../../application';
-import type { CallManager } from '../../../application';
+import { CallManager, type RoomManager as ApplicationRoomManager } from '../../../application';
 import type { AdapterManager } from '../../../adapter';
 import type { ApplicationRoom } from '../../../application/services/types';
 
@@ -49,7 +48,7 @@ export interface HandlerContext {
   callManager: CallManager;
   // Adapter Layer
   adapterManager: AdapterManager;
-  redisManager: RedisManager | null;
+  stateStore: StateStore | null;
   jwtConfig: JwtConfig;
   connections: Map<string, WebSocketConnection>;
   broadcast: BroadcastFunction;

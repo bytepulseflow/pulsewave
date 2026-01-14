@@ -10,10 +10,10 @@
 import http from 'http';
 import express, { Application, Request, Response, NextFunction } from 'express';
 import { getConfig } from './config';
-import { createWorker, MediasoupWorker } from './adapter';
+import { AdapterManager, createWorker, MediasoupWorker } from './adapter';
 import { WebSocketServer, routes } from './transport';
-import { AdapterManager } from './adapter';
-import { RedisManager } from './redis';
+import type { StateStore } from './state';
+import { RedisStateStore } from './state';
 import { createModuleLogger } from './utils/logger';
 
 const logger = createModuleLogger('server');
@@ -31,7 +31,7 @@ class MediasoupServer {
   private app: Application;
   private httpServer: http.Server;
   private workers: MediasoupWorker[];
-  private redisManager: RedisManager | null;
+  private stateStore: StateStore | null;
   private wsServer!: WebSocketServer;
   private config = getConfig();
 
@@ -39,7 +39,7 @@ class MediasoupServer {
     this.app = express();
     this.httpServer = http.createServer(this.app);
     this.workers = [];
-    this.redisManager = null;
+    this.stateStore = null;
 
     this.setupMiddleware();
     this.setupRoutes();
@@ -91,7 +91,12 @@ class MediasoupServer {
 
     if (this.config.redis.enabled) {
       logger.info('Connecting to Redis...');
-      this.redisManager = new RedisManager(this.config.redis);
+      this.stateStore = new RedisStateStore({
+        host: this.config.redis.host,
+        port: this.config.redis.port,
+        password: this.config.redis.password,
+        db: this.config.redis.db,
+      });
       await new Promise((resolve) => setTimeout(resolve, 100));
       logger.info('Redis connected');
     }
@@ -115,7 +120,7 @@ class MediasoupServer {
 
     this.wsServer = new WebSocketServer(
       this.httpServer,
-      this.redisManager,
+      this.stateStore,
       this.config.jwt,
       adapterManager
     );
@@ -152,8 +157,8 @@ class MediasoupServer {
     }
     this.workers = [];
 
-    if (this.redisManager) {
-      await this.redisManager.close();
+    if (this.stateStore) {
+      await this.stateStore.close();
     }
 
     return new Promise((resolve) => {

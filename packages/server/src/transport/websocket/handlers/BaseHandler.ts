@@ -5,12 +5,14 @@
  * - Message validation
  * - Error sending
  * - Message sending helpers
+ * - Domain error handling
  */
 
 import type { WebSocketConnection, HandlerContext } from './types';
 import type { ClientIntent, ServerResponse } from '@bytepulse/pulsewave-shared';
 import { ErrorCode } from '@bytepulse/pulsewave-shared';
 import { createModuleLogger } from '../../../utils/logger';
+import { toDomainError } from '../../../domain';
 
 const logger = createModuleLogger('handler:base');
 
@@ -50,6 +52,58 @@ export abstract class BaseHandler {
         message,
       },
     });
+  }
+
+  /**
+   * Handle domain errors and convert them to error responses
+   */
+  protected handleError(ws: WebSocketConnection, error: unknown): void {
+    const domainError = toDomainError(error);
+    logger.error({ error: domainError }, 'Handler error');
+
+    // Map domain error codes to ErrorCode enum
+    let errorCode = ErrorCode.Unknown;
+    switch (domainError.code) {
+      case 'RESOURCE_NOT_FOUND':
+        errorCode = ErrorCode.NotFound;
+        break;
+      case 'RESOURCE_EXISTS':
+        errorCode = ErrorCode.Unknown;
+        break;
+      case 'INVALID_STATE':
+        errorCode = ErrorCode.Unknown;
+        break;
+      case 'VALIDATION_ERROR':
+        errorCode = ErrorCode.Unknown;
+        break;
+      case 'RATE_LIMIT_EXCEEDED':
+        errorCode = ErrorCode.Unknown;
+        break;
+      case 'AUTHENTICATION_FAILED':
+        errorCode = ErrorCode.Unauthorized;
+        break;
+      case 'AUTHORIZATION_FAILED':
+        errorCode = ErrorCode.Unauthorized;
+        break;
+      case 'TIMEOUT':
+        errorCode = ErrorCode.Unknown;
+        break;
+      case 'CIRCUIT_BREAKER_OPEN':
+        errorCode = ErrorCode.Unknown;
+        break;
+      case 'MEDIA_ERROR':
+        errorCode = ErrorCode.Unknown;
+        break;
+      case 'NETWORK_ERROR':
+        errorCode = ErrorCode.Unknown;
+        break;
+      case 'INTERNAL_ERROR':
+      default:
+        errorCode = ErrorCode.Unknown;
+        break;
+    }
+
+    this.sendError(ws, errorCode, domainError.message);
   }
 
   /**
