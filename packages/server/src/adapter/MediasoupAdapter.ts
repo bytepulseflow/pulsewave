@@ -74,6 +74,16 @@ export class MediasoupAdapter implements MediaAdapter {
   private transportDataProducers: Map<string, Set<string>>;
   private transportDataConsumers: Map<string, Set<string>>;
 
+  // Track creation time for cleanup
+  private transportCreationTimes: Map<string, number>;
+  private producerCreationTimes: Map<string, number>;
+  private consumerCreationTimes: Map<string, number>;
+  private dataProducerCreationTimes: Map<string, number>;
+  private dataConsumerCreationTimes: Map<string, number>;
+
+  // Cleanup interval
+  private cleanupInterval: NodeJS.Timeout | null;
+
   constructor(options: MediasoupAdapterOptions) {
     this.router = options.router;
     this.options = options;
@@ -88,6 +98,209 @@ export class MediasoupAdapter implements MediaAdapter {
     this.transportConsumers = new Map();
     this.transportDataProducers = new Map();
     this.transportDataConsumers = new Map();
+
+    // Initialize creation time tracking
+    this.transportCreationTimes = new Map();
+    this.producerCreationTimes = new Map();
+    this.consumerCreationTimes = new Map();
+    this.dataProducerCreationTimes = new Map();
+    this.dataConsumerCreationTimes = new Map();
+
+    // Initialize cleanup interval
+    this.cleanupInterval = null;
+
+    // Start automatic cleanup if enabled
+    if (options.enableAutoCleanup !== false) {
+      this.startAutoCleanup();
+    }
+  }
+
+  /**
+   * Start automatic cleanup interval
+   */
+  private startAutoCleanup(): void {
+    const cleanupIntervalMs = this.options.cleanupIntervalMs || 5 * 60 * 1000; // Default: 5 minutes
+    const resourceMaxAge = this.options.resourceMaxAge || 60 * 60 * 1000; // Default: 1 hour
+
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupOrphanedResources(resourceMaxAge);
+    }, cleanupIntervalMs);
+
+    logger.info(
+      `Auto-cleanup started (interval: ${cleanupIntervalMs}ms, max age: ${resourceMaxAge}ms)`
+    );
+  }
+
+  /**
+   * Stop automatic cleanup interval
+   */
+  private stopAutoCleanup(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+      logger.info('Auto-cleanup stopped');
+    }
+  }
+
+  /**
+   * Cleanup orphaned resources older than maxAge
+   */
+  private cleanupOrphanedResources(maxAge: number): void {
+    const now = Date.now();
+    let cleaned = 0;
+
+    // Cleanup orphaned transports (no associated producers/consumers)
+    for (const [transportId, transport] of this.transports.entries()) {
+      const creationTime = this.transportCreationTimes.get(transportId) || 0;
+      const age = now - creationTime;
+
+      // Check if transport is orphaned (no child resources) and old enough
+      const hasChildren =
+        (this.transportProducers.get(transportId)?.size || 0) > 0 ||
+        (this.transportConsumers.get(transportId)?.size || 0) > 0 ||
+        (this.transportDataProducers.get(transportId)?.size || 0) > 0 ||
+        (this.transportDataConsumers.get(transportId)?.size || 0) > 0;
+
+      if (!hasChildren && age > maxAge) {
+        logger.warn(`Cleaning up orphaned transport: ${transportId} (age: ${age}ms)`);
+        transport.close();
+        this.transports.delete(transportId);
+        this.transportCreationTimes.delete(transportId);
+        this.transportProducers.delete(transportId);
+        this.transportConsumers.delete(transportId);
+        this.transportDataProducers.delete(transportId);
+        this.transportDataConsumers.delete(transportId);
+        cleaned++;
+      }
+    }
+
+    // Cleanup orphaned producers (no associated transport)
+    for (const [producerId, producer] of this.producers.entries()) {
+      const creationTime = this.producerCreationTimes.get(producerId) || 0;
+      const age = now - creationTime;
+
+      // Check if producer is orphaned (not in any transport's producer list)
+      let isOrphaned = true;
+      for (const producerIds of this.transportProducers.values()) {
+        if (producerIds.has(producerId)) {
+          isOrphaned = false;
+          break;
+        }
+      }
+
+      if (isOrphaned && age > maxAge) {
+        logger.warn(`Cleaning up orphaned producer: ${producerId} (age: ${age}ms)`);
+        producer.close();
+        this.producers.delete(producerId);
+        this.producerCreationTimes.delete(producerId);
+        cleaned++;
+      }
+    }
+
+    // Cleanup orphaned consumers
+    for (const [consumerId, consumer] of this.consumers.entries()) {
+      const creationTime = this.consumerCreationTimes.get(consumerId) || 0;
+      const age = now - creationTime;
+
+      let isOrphaned = true;
+      for (const consumerIds of this.transportConsumers.values()) {
+        if (consumerIds.has(consumerId)) {
+          isOrphaned = false;
+          break;
+        }
+      }
+
+      if (isOrphaned && age > maxAge) {
+        logger.warn(`Cleaning up orphaned consumer: ${consumerId} (age: ${age}ms)`);
+        consumer.close();
+        this.consumers.delete(consumerId);
+        this.consumerCreationTimes.delete(consumerId);
+        cleaned++;
+      }
+    }
+
+    // Cleanup orphaned data producers
+    for (const [dataProducerId, dataProducer] of this.dataProducers.entries()) {
+      const creationTime = this.dataProducerCreationTimes.get(dataProducerId) || 0;
+      const age = now - creationTime;
+
+      let isOrphaned = true;
+      for (const dataProducerIds of this.transportDataProducers.values()) {
+        if (dataProducerIds.has(dataProducerId)) {
+          isOrphaned = false;
+          break;
+        }
+      }
+
+      if (isOrphaned && age > maxAge) {
+        logger.warn(`Cleaning up orphaned data producer: ${dataProducerId} (age: ${age}ms)`);
+        dataProducer.close();
+        this.dataProducers.delete(dataProducerId);
+        this.dataProducerCreationTimes.delete(dataProducerId);
+        cleaned++;
+      }
+    }
+
+    // Cleanup orphaned data consumers
+    for (const [dataConsumerId, dataConsumer] of this.dataConsumers.entries()) {
+      const creationTime = this.dataConsumerCreationTimes.get(dataConsumerId) || 0;
+      const age = now - creationTime;
+
+      let isOrphaned = true;
+      for (const dataConsumerIds of this.transportDataConsumers.values()) {
+        if (dataConsumerIds.has(dataConsumerId)) {
+          isOrphaned = false;
+          break;
+        }
+      }
+
+      if (isOrphaned && age > maxAge) {
+        logger.warn(`Cleaning up orphaned data consumer: ${dataConsumerId} (age: ${age}ms)`);
+        dataConsumer.close();
+        this.dataConsumers.delete(dataConsumerId);
+        this.dataConsumerCreationTimes.delete(dataConsumerId);
+        cleaned++;
+      }
+    }
+
+    if (cleaned > 0) {
+      logger.info(`Auto-cleanup removed ${cleaned} orphaned resources`);
+    }
+  }
+
+  /**
+   * Get resource statistics
+   */
+  public getResourceStats(): {
+    transports: number;
+    producers: number;
+    consumers: number;
+    dataProducers: number;
+    dataConsumers: number;
+    total: number;
+  } {
+    return {
+      transports: this.transports.size,
+      producers: this.producers.size,
+      consumers: this.consumers.size,
+      dataProducers: this.dataProducers.size,
+      dataConsumers: this.dataConsumers.size,
+      total:
+        this.transports.size +
+        this.producers.size +
+        this.consumers.size +
+        this.dataProducers.size +
+        this.dataConsumers.size,
+    };
+  }
+
+  /**
+   * Shutdown the adapter and cleanup all resources
+   */
+  public async shutdown(): Promise<void> {
+    this.stopAutoCleanup();
+    await this.close();
+    logger.info('MediasoupAdapter shutdown complete');
   }
 
   /**
@@ -116,6 +329,7 @@ export class MediasoupAdapter implements MediaAdapter {
     );
 
     this.transports.set(transport.id, transport);
+    this.transportCreationTimes.set(transport.id, Date.now());
 
     // Initialize ownership tracking for this transport
     this.transportProducers.set(transport.id, new Set());
@@ -185,6 +399,7 @@ export class MediasoupAdapter implements MediaAdapter {
     );
 
     this.producers.set(producer.id, producer);
+    this.producerCreationTimes.set(producer.id, Date.now());
 
     // Track ownership
     const producerIds = this.transportProducers.get(transportId);
@@ -255,6 +470,7 @@ export class MediasoupAdapter implements MediaAdapter {
     );
 
     this.consumers.set(consumer.id, consumer);
+    this.consumerCreationTimes.set(consumer.id, Date.now());
 
     // Track ownership
     const consumerIds = this.transportConsumers.get(transportId);
@@ -404,6 +620,7 @@ export class MediasoupAdapter implements MediaAdapter {
     );
 
     this.dataProducers.set(dataProducer.id, dataProducer);
+    this.dataProducerCreationTimes.set(dataProducer.id, Date.now());
 
     // Track ownership
     const dataProducerIds = this.transportDataProducers.get(transportId);
@@ -457,6 +674,7 @@ export class MediasoupAdapter implements MediaAdapter {
     );
 
     this.dataConsumers.set(dataConsumer.id, dataConsumer);
+    this.dataConsumerCreationTimes.set(dataConsumer.id, Date.now());
 
     // Track ownership
     const dataConsumerIds = this.transportDataConsumers.get(transportId);
@@ -536,6 +754,7 @@ export class MediasoupAdapter implements MediaAdapter {
     this.transportConsumers.delete(transportId);
     this.transportDataProducers.delete(transportId);
     this.transportDataConsumers.delete(transportId);
+    this.transportCreationTimes.delete(transportId);
   }
 
   /**
@@ -595,6 +814,13 @@ export class MediasoupAdapter implements MediaAdapter {
     this.transportConsumers.clear();
     this.transportDataProducers.clear();
     this.transportDataConsumers.clear();
+
+    // Clear creation time tracking
+    this.transportCreationTimes.clear();
+    this.producerCreationTimes.clear();
+    this.consumerCreationTimes.clear();
+    this.dataProducerCreationTimes.clear();
+    this.dataConsumerCreationTimes.clear();
 
     // Clear remaining resources (should be empty if transports closed properly)
     this.producers.clear();

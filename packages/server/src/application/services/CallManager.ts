@@ -75,13 +75,60 @@ export class CallManager {
   private calls: Map<string, ApplicationCall>;
   private activeCallsByParticipant: Map<string, string>; // participantSid -> callId
   private callsBetweenParticipants: Map<string, string>; // "sid1-sid2" -> callId
+  private cleanupInterval: NodeJS.Timeout | null;
   private options: CallManagerOptions;
 
   constructor(options: CallManagerOptions = {}) {
     this.calls = new Map();
     this.activeCallsByParticipant = new Map();
     this.callsBetweenParticipants = new Map();
+    this.cleanupInterval = null;
     this.options = options;
+
+    // Start automatic cleanup if enabled
+    if (options.enableAutoCleanup !== false) {
+      this.startAutoCleanup();
+    }
+  }
+
+  /**
+   * Start automatic cleanup interval
+   */
+  private startAutoCleanup(): void {
+    const cleanupIntervalMs = this.options.cleanupIntervalMs || 60 * 60 * 1000; // Default: 1 hour
+
+    this.cleanupInterval = setInterval(() => {
+      const before = this.calls.size;
+      this.cleanupOldCalls(this.options.cleanupMaxAge || 60 * 60 * 1000); // Default: 1 hour
+      const after = this.calls.size;
+      const cleaned = before - after;
+
+      if (cleaned > 0) {
+        logger.info(`Auto-cleanup removed ${cleaned} old calls`);
+      }
+    }, cleanupIntervalMs);
+
+    logger.info(`Auto-cleanup started (interval: ${cleanupIntervalMs}ms)`);
+  }
+
+  /**
+   * Stop automatic cleanup interval
+   */
+  private stopAutoCleanup(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+      logger.info('Auto-cleanup stopped');
+    }
+  }
+
+  /**
+   * Shutdown the CallManager and cleanup resources
+   */
+  public shutdown(): void {
+    this.stopAutoCleanup();
+    this.clearAllCalls();
+    logger.info('CallManager shutdown complete');
   }
 
   /**
@@ -347,5 +394,36 @@ export class CallManager {
     this.activeCallsByParticipant.clear();
     this.callsBetweenParticipants.clear();
     logger.info('Cleared all calls');
+  }
+
+  /**
+   * Get cleanup statistics
+   */
+  public getCleanupStats(): {
+    totalCalls: number;
+    endedCalls: number;
+    rejectedCalls: number;
+    activeCalls: number;
+  } {
+    let endedCalls = 0;
+    let rejectedCalls = 0;
+    let activeCalls = 0;
+
+    for (const call of this.calls.values()) {
+      if (call.state === 'ended') {
+        endedCalls++;
+      } else if (call.state === 'rejected') {
+        rejectedCalls++;
+      } else {
+        activeCalls++;
+      }
+    }
+
+    return {
+      totalCalls: this.calls.size,
+      endedCalls,
+      rejectedCalls,
+      activeCalls,
+    };
   }
 }

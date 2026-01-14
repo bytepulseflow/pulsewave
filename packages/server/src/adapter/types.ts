@@ -56,4 +56,7 @@ export interface MediasoupAdapterOptions {
   listenIps: { ip: string; announcedIp?: string }[];
   initialAvailableOutgoingBitrate?: number;
   minimumAvailableOutgoingBitrate?: number;
+  enableAutoCleanup?: boolean;
+  cleanupIntervalMs?: number;
+  resourceMaxAge?: number;
 }

@@ -83,6 +83,9 @@ export interface RoomCreationResult {
  */
 export interface CallManagerOptions {
   allowMultipleCalls?: boolean;
+  enableAutoCleanup?: boolean;
+  cleanupIntervalMs?: number;
+  cleanupMaxAge?: number;
 }
 
 /**
