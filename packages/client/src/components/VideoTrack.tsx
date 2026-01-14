@@ -2,7 +2,7 @@
  * VideoTrack - Component for rendering video tracks
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, memo } from 'react';
 import type { RemoteTrack, LocalTrack } from '../types';
 
 interface VideoTrackProps {
@@ -16,7 +16,7 @@ interface VideoTrackProps {
 /**
  * VideoTrack component - Renders a video track with modern styling
  */
-export function VideoTrack({
+export const VideoTrack = memo(function VideoTrack({
   track,
   className = '',
   muted = false,
@@ -127,4 +127,4 @@ export function VideoTrack({
       )}
     </div>
   );
-}
+});

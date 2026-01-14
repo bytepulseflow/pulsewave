@@ -11,17 +11,17 @@ import { useRoomContext } from '../context';
  * useTracks - Hook to access all remote tracks
  */
 export function useTracks(): TrackInfo[] {
-  const { participants } = useRoomContext();
+  const { participantsArray } = useRoomContext();
 
   return useMemo(() => {
     const tracks: TrackInfo[] = [];
-    participants.forEach((participant) => {
+    participantsArray.forEach((participant) => {
       participant.tracks.forEach((track) => {
         tracks.push(track);
       });
     });
     return tracks;
-  }, [participants]);
+  }, [participantsArray]);
 }
 
 /**
@@ -51,15 +51,15 @@ export function useVideoTracks(): TrackInfo[] {
  * useTrackPublications - Hook to access all remote track publications
  */
 export function useTrackPublications(): TrackInfo[] {
-  const { participants } = useRoomContext();
+  const { participantsArray } = useRoomContext();
 
   return useMemo(() => {
     const publications: TrackInfo[] = [];
-    participants.forEach((participant) => {
+    participantsArray.forEach((participant) => {
       publications.push(...participant.tracks);
     });
     return publications;
-  }, [participants]);
+  }, [participantsArray]);
 }
 
 /**

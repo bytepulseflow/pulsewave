@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { useAudioAnalyzer } from '../hooks/useAudioAnalyzer';
 import './avatar.css';
 
@@ -15,7 +15,12 @@ type Props = {
   fallbackName?: string;
 };
 
-export function AvatarPulse({ audioTrack, rings: ringsProp, avatarUrl, fallbackName }: Props) {
+export const AvatarPulse = memo(function AvatarPulse({
+  audioTrack,
+  rings: ringsProp,
+  avatarUrl,
+  fallbackName,
+}: Props) {
   const [rings, setRings] = useState({
     ring1: 0,
     ring2: 0,
@@ -69,4 +74,4 @@ export function AvatarPulse({ audioTrack, rings: ringsProp, avatarUrl, fallbackN
       )}
     </div>
   );
-}
+});

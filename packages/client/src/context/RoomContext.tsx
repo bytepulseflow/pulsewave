@@ -9,6 +9,7 @@ import React, {
   useEffect,
   useState,
   useRef,
+  useMemo,
   ReactNode,
 } from 'react';
 import type { ConnectionState, ParticipantInfo } from '@bytepulse/pulsewave-shared';
@@ -38,9 +39,14 @@ export interface RoomContextValue {
   localParticipant: ParticipantInfo | null;
 
   /**
-   * Remote participants
+   * Remote participants as a Map for O(1) lookup
    */
-  participants: ParticipantInfo[];
+  participants: Map<string, ParticipantInfo>;
+
+  /**
+   * Remote participants as an array (for backward compatibility)
+   */
+  participantsArray: ParticipantInfo[];
 
   /**
    * Whether currently connecting
@@ -114,7 +120,7 @@ export function RoomProvider({
     'disconnected' as ConnectionState
   );
   const [localParticipant, setLocalParticipant] = useState<ParticipantInfo | null>(null);
-  const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
+  const [participantsMap, setParticipantsMap] = useState<Map<string, ParticipantInfo>>(new Map());
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
@@ -166,22 +172,29 @@ export function RoomProvider({
           otherParticipants: ParticipantInfo[];
         }) => {
           setLocalParticipant(data.participant);
-          setParticipants(data.otherParticipants);
+          const map = new Map<string, ParticipantInfo>();
+          data.otherParticipants.forEach((p) => map.set(p.sid, p));
+          setParticipantsMap(map);
         }
       );
 
       roomClient.on('participant-joined', (participant: ParticipantInfo) => {
-        setParticipants((prev) => {
+        setParticipantsMap((prev) => {
+          const newMap = new Map(prev);
           // Check for duplicates by SID
-          if (prev.some((p) => p.sid === participant.sid)) {
-            return prev;
+          if (!newMap.has(participant.sid)) {
+            newMap.set(participant.sid, participant);
           }
-          return [...prev, participant];
+          return newMap;
         });
       });
 
       roomClient.on('participant-left', (participantSid: string) => {
-        setParticipants((prev) => prev.filter((p) => p.sid !== participantSid));
+        setParticipantsMap((prev) => {
+          const newMap = new Map(prev);
+          newMap.delete(participantSid);
+          return newMap;
+        });
       });
 
       roomClient.on('error', (err: Error) => {
@@ -219,7 +232,7 @@ export function RoomProvider({
       setRoom(null);
       setConnectionState('disconnected' as ConnectionState);
       setLocalParticipant(null);
-      setParticipants([]);
+      setParticipantsMap(new Map());
       setError(null);
     }
   }, [room]);
@@ -249,16 +262,32 @@ export function RoomProvider({
     };
   }, [room]);
 
-  const value: RoomContextValue = {
-    room,
-    connectionState,
-    localParticipant,
-    participants,
-    isConnecting,
-    connect,
-    disconnect,
-    error,
-  };
+  const participantsArray = useMemo(() => Array.from(participantsMap.values()), [participantsMap]);
+
+  const value: RoomContextValue = useMemo(
+    () => ({
+      room,
+      connectionState,
+      localParticipant,
+      participants: participantsMap,
+      participantsArray,
+      isConnecting,
+      connect,
+      disconnect,
+      error,
+    }),
+    [
+      room,
+      connectionState,
+      localParticipant,
+      participantsMap,
+      participantsArray,
+      isConnecting,
+      connect,
+      disconnect,
+      error,
+    ]
+  );
 
   return <RoomContext.Provider value={value}>{children}</RoomContext.Provider>;
 }

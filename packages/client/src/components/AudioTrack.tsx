@@ -2,7 +2,7 @@
  * AudioTrack - Component for rendering audio tracks
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, memo } from 'react';
 import type { RemoteTrack, LocalTrack } from '../types';
 
 interface AudioTrackProps {
@@ -13,7 +13,10 @@ interface AudioTrackProps {
 /**
  * AudioTrack component - Renders an audio track
  */
-export function AudioTrack({ track, onAudioElement }: AudioTrackProps): JSX.Element | null {
+export const AudioTrack = memo(function AudioTrack({
+  track,
+  onAudioElement,
+}: AudioTrackProps): JSX.Element | null {
   const audioRef = useRef<HTMLAudioElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
@@ -63,4 +66,4 @@ export function AudioTrack({ track, onAudioElement }: AudioTrackProps): JSX.Elem
       <audio ref={audioRef} autoPlay playsInline style={{ display: 'none' }} />
     </div>
   );
-}
+});

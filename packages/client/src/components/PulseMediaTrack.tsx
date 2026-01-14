@@ -4,7 +4,7 @@
  * Does NOT stop tracks - they are managed by mediasoup producer/consumer.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, memo } from 'react';
 import type { LocalTrackPublication, RemoteTrackPublication } from '../types';
 import { AvatarPulse } from './AvatarPulse';
 
@@ -24,7 +24,7 @@ interface PulseMediaTrackProps {
 /**
  * PulseMediaTrack component - Renders audio or video track based on publication kind
  */
-export function PulseMediaTrack({
+export const PulseMediaTrack = memo(function PulseMediaTrack({
   publication,
   className = '',
   videoClassName = '',
@@ -230,4 +230,4 @@ export function PulseMediaTrack({
   }
 
   return null;
-}
+});

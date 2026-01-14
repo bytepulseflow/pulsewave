@@ -2,7 +2,7 @@
  * PulseParticipantView - Simplified component for rendering a participant with all their tracks
  */
 
-import { useMemo } from 'react';
+import { useMemo, memo } from 'react';
 import type { Participant, LocalParticipant } from '../types';
 import { TrackSource } from '@bytepulse/pulsewave-shared';
 import { PulseMediaTrack } from './PulseMediaTrack';
@@ -33,16 +33,7 @@ interface PulseParticipantViewProps {
   speakingThreshold?: number;
 }
 
-/**
- * PulseParticipantView component - Renders a participant with all their tracks automatically
- *
- * @example
- * ```tsx
- * <PulseParticipantView participant={localParticipant} showIdentity />
- * <PulseParticipantView participant={remoteParticipant} showIdentity />
- * ```
- */
-export function PulseParticipantView({
+export const PulseParticipantView = memo(function PulseParticipantView({
   participant,
   className = '',
   videoClassName = '',
@@ -167,4 +158,4 @@ export function PulseParticipantView({
       )}
     </div>
   );
-}
+});
